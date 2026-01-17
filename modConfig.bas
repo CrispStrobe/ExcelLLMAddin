@@ -30,27 +30,27 @@ Public Function GetConfigLocation() As String
     ReDim paths(0 To 4)
     
     If Environ("HOME") <> "" Then
-        paths(0) = Environ("HOME") & "/ExcelLLMAddin_config.txt"
+        paths(0) = Environ("HOME") & "/LLMExcelAddin_config.txt"
     End If
     
     If Environ("USERPROFILE") <> "" Then
-        paths(1) = Environ("USERPROFILE") & "\ExcelLLMAddin_config.txt"
+        paths(1) = Environ("USERPROFILE") & "\LLMExcelAddin_config.txt"
     End If
     
     On Error Resume Next
-    paths(2) = Application.DefaultFilePath & Application.PathSeparator & "ExcelLLMAddin_config.txt"
-    paths(3) = ThisWorkbook.Path & Application.PathSeparator & "ExcelLLMAddin_config.txt"
+    paths(2) = Application.DefaultFilePath & Application.PathSeparator & "LLMExcelAddin_config.txt"
+    paths(3) = ThisWorkbook.Path & Application.PathSeparator & "LLMExcelAddin_config.txt"
     On Error GoTo 0
     
-    paths(4) = Environ("TMPDIR") & "ExcelLLMAddin_config.txt"
-    If paths(4) = "ExcelLLMAddin_config.txt" Then
-        paths(4) = Environ("TEMP") & "\ExcelLLMAddin_config.txt"
+    paths(4) = Environ("TMPDIR") & "LLMExcelAddin_config.txt"
+    If paths(4) = "LLMExcelAddin_config.txt" Then
+        paths(4) = Environ("TEMP") & "\LLMExcelAddin_config.txt"
     End If
     
     ' Return first existing file
     For i = LBound(paths) To UBound(paths)
         testPath = paths(i)
-        If testPath <> "" And testPath <> "\ExcelLLMAddin_config.txt" And testPath <> "/ExcelLLMAddin_config.txt" Then
+        If testPath <> "" And testPath <> "\LLMExcelAddin_config.txt" And testPath <> "/LLMExcelAddin_config.txt" Then
             If Dir(testPath) <> "" Then
                 GetConfigLocation = testPath
                 Exit Function
@@ -61,13 +61,13 @@ Public Function GetConfigLocation() As String
     ' Return first valid path for creation
     For i = LBound(paths) To UBound(paths)
         testPath = paths(i)
-        If testPath <> "" And testPath <> "\ExcelLLMAddin_config.txt" And testPath <> "/ExcelLLMAddin_config.txt" Then
+        If testPath <> "" And testPath <> "\LLMExcelAddin_config.txt" And testPath <> "/LLMExcelAddin_config.txt" Then
             GetConfigLocation = testPath
             Exit Function
         End If
     Next i
     
-    GetConfigLocation = "ExcelLLMAddin_config.txt"
+    GetConfigLocation = "LLMExcelAddin_config.txt"
 End Function
 
 ' Load configuration from file

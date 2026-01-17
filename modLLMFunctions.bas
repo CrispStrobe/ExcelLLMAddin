@@ -10,14 +10,20 @@ Private Function IsMac() As Boolean
     #End If
 End Function
 
-' Main PROMPT function
+' Main PROMPT function - WITH FULL DEBUG
 Public Function prompt(promptText As String, Optional provider As String = "", Optional model As String = "") As String
     On Error GoTo ErrorHandler
     
     Application.Volatile
     
+    Debug.Print ""
+    Debug.Print "========================================="
+    Debug.Print "[PROMPT] === CALLED ==="
+    Debug.Print "========================================="
+    
     ' Load config if needed
     If CurrentProvider = "" Or OLLAMA_BASE_URL = "" Then
+        Debug.Print "[PROMPT] Loading config..."
         Call LoadConfig
     End If
     
@@ -36,13 +42,20 @@ Public Function prompt(promptText As String, Optional provider As String = "", O
     baseURL = GetBaseURL(provider)
     apiKey = GetAPIKey(provider)
     
+    Debug.Print "[PROMPT] Provider: '" & provider & "'"
+    Debug.Print "[PROMPT] Model: '" & model & "'"
+    Debug.Print "[PROMPT] BaseURL: '" & baseURL & "'"
+    Debug.Print "[PROMPT] Prompt: '" & Left(promptText, 100) & "'"
+    
     If baseURL = "" Then
         prompt = "Error: Invalid provider"
+        Debug.Print "[PROMPT] *** " & prompt
         Exit Function
     End If
     
     If apiKey = "" And provider <> "ollama" Then
         prompt = "Error: No API key for " & provider
+        Debug.Print "[PROMPT] *** " & prompt
         Exit Function
     End If
     
@@ -63,20 +76,42 @@ Public Function prompt(promptText As String, Optional provider As String = "", O
                       "{""role"":""user"",""content"":""" & EscapeJSON(promptText) & """}]}"
     End Select
     
+    Debug.Print "[PROMPT] Endpoint: " & endpoint
+    Debug.Print "[PROMPT] Request body length: " & Len(jsonBody)
+    Debug.Print "[PROMPT] Calling HTTPPost..."
+    
     response = HTTPPost(endpoint, jsonBody, apiKey, provider)
+    
+    Debug.Print "[PROMPT] HTTPPost returned, length: " & Len(response)
+    Debug.Print "[PROMPT] Response preview: " & Left(response, 200)
     
     If Left(response, 6) = "Error:" Then
         prompt = response
+        Debug.Print "[PROMPT] *** HTTP Error: " & response
         Exit Function
     End If
     
+    Debug.Print "[PROMPT] Calling ParseJSONContent..."
     prompt = ParseJSONContent(response, provider)
-    prompt = FixEncoding(prompt)
+    
+    Debug.Print "[PROMPT] ParseJSONContent returned: " & Left(prompt, 100)
+    
+    If Left(prompt, 6) <> "Error:" Then
+        Debug.Print "[PROMPT] Calling FixEncoding..."
+        prompt = FixEncoding(prompt)
+        Debug.Print "[PROMPT] After FixEncoding: " & Left(prompt, 100)
+    End If
+    
+    Debug.Print "[PROMPT] *** FINAL RESULT: " & Left(prompt, 100)
+    Debug.Print "========================================="
+    Debug.Print ""
     
     Exit Function
     
 ErrorHandler:
     prompt = "Error: " & Err.Number & " - " & Err.Description
+    Debug.Print "[PROMPT] *** EXCEPTION: " & prompt
+    Debug.Print "========================================="
 End Function
 
 ' List models
@@ -389,51 +424,88 @@ Private Function FixEncoding(text As String) As String
     FixEncoding = result
 End Function
 
-' Parse JSON content
+' Parse JSON content - WITH FULL DEBUG
 Private Function ParseJSONContent(jsonText As String, Optional provider As String = "") As String
     On Error GoTo ErrorHandler
     
+    Debug.Print "[Parse] ========================================="
+    Debug.Print "[Parse] Provider: '" & provider & "'"
+    Debug.Print "[Parse] JSON Length: " & Len(jsonText)
+    Debug.Print "[Parse] JSON Preview (first 300 chars): " & Left(jsonText, 300)
+    
     Dim startPos As Long, endPos As Long, content As String
     
+    ' Try Ollama format first
     If LCase(Trim(provider)) = "ollama" Then
+        Debug.Print "[Parse] Looking for Ollama format..."
         startPos = InStr(jsonText, """message""")
-        If startPos > 0 Then startPos = InStr(startPos, jsonText, """content"":""")
+        Debug.Print "[Parse] Found 'message' at position: " & startPos
+        
+        If startPos > 0 Then
+            startPos = InStr(startPos, jsonText, """content"":""")
+            Debug.Print "[Parse] Found 'content' at position: " & startPos
+        End If
     End If
     
+    ' Try standard format
     If startPos = 0 Then
+        Debug.Print "[Parse] Looking for standard format..."
         startPos = InStr(jsonText, """content"":""")
-        If startPos = 0 Then startPos = InStr(jsonText, """content"": """)
+        If startPos = 0 Then
+            startPos = InStr(jsonText, """content"": """)
+        End If
+        Debug.Print "[Parse] Found 'content' at position: " & startPos
     End If
     
     If startPos > 0 Then
         startPos = InStr(startPos, jsonText, ":""") + 2
+        Debug.Print "[Parse] Content starts at position: " & startPos
         endPos = startPos
         
+        ' Find closing quote
         Do While endPos < Len(jsonText)
             endPos = InStr(endPos + 1, jsonText, """")
-            If endPos = 0 Then Exit Do
-            If Mid(jsonText, endPos - 1, 1) <> "\" Then Exit Do
+            If endPos = 0 Then
+                Debug.Print "[Parse] *** No closing quote found!"
+                Exit Do
+            End If
+            If Mid(jsonText, endPos - 1, 1) <> "\" Then
+                Debug.Print "[Parse] Found closing quote at position: " & endPos
+                Exit Do
+            End If
         Loop
         
         If endPos > startPos Then
             content = Mid(jsonText, startPos, endPos - startPos)
+            Debug.Print "[Parse] Extracted content length: " & Len(content)
+            Debug.Print "[Parse] Raw content: " & Left(content, 150)
+            
+            ' Unescape JSON
             content = Replace(content, "\n", vbCrLf)
             content = Replace(content, "\r", vbCr)
             content = Replace(content, "\t", vbTab)
             content = Replace(content, "\""", """")
             content = Replace(content, "\\", "\")
+            
             ParseJSONContent = content
+            Debug.Print "[Parse] *** SUCCESS! Final content: " & Left(content, 100)
         Else
-            ParseJSONContent = "Error: Parse failed"
+            ParseJSONContent = "Error: Parse failed - no closing quote (endPos=" & endPos & ", startPos=" & startPos & ")"
+            Debug.Print "[Parse] *** " & ParseJSONContent
         End If
     Else
-        ParseJSONContent = "Error: No content found"
+        ParseJSONContent = "Error: No content found in JSON"
+        Debug.Print "[Parse] *** " & ParseJSONContent
+        Debug.Print "[Parse] Full JSON: " & jsonText
     End If
+    
+    Debug.Print "[Parse] ========================================="
     
     Exit Function
     
 ErrorHandler:
-    ParseJSONContent = "Error: " & Err.Description
+    ParseJSONContent = "Error: " & Err.Number & " - " & Err.Description
+    Debug.Print "[Parse] *** EXCEPTION: " & ParseJSONContent
 End Function
 
 ' Parse model list
