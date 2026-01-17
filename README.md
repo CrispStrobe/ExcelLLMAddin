@@ -141,4 +141,4 @@ You can edit this file manually or use ShowSettings.
 
 ## License
 
-MIT License - feel free to modify and distribute!
+AGPL-3.0 license
