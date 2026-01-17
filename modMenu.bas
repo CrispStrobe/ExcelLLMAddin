@@ -56,6 +56,33 @@ Public Sub Auto_Close()
     Call RemoveKeyboardShortcuts
 End Sub
 
+' Show model selector
+Public Sub ShowModelSelector()
+    Dim models As String
+    Dim modelArray() As String
+    Dim i As Integer
+    Dim selectedModel As String
+
+    models = LIST_MODELS()
+    If Left(models, 6) = "Error:" Then
+        MsgBox "Cannot list models: " & models, vbExclamation
+        Exit Sub
+    End If
+
+    modelArray = Split(models, vbCrLf)
+    selectedModel = InputBox("Available Models:" & vbCrLf & vbCrLf & _
+                            Join(modelArray, ", ") & vbCrLf & vbCrLf & _
+                            "Enter model name to use:", _
+                            "Model Selector", _
+                            CurrentModel)
+
+    If selectedModel <> "" Then
+        CurrentModel = selectedModel
+        Call SaveConfig
+        MsgBox "Model set to: " & CurrentModel, vbInformation
+    End If
+End Sub
+
 ' Setup keyboard shortcuts
 Private Sub SetupKeyboardShortcuts()
     On Error Resume Next
@@ -218,6 +245,11 @@ Public Sub ShowSettings()
         Case "D"
             Debug.Print "[ShowSettings] -> FullDiagnostic"
             Call FullDiagnostic
+            Call ShowSettings
+
+        Case "M"
+            Debug.Print "[ShowSettings] -> SelectOllamaModel"
+            Call SelectOllamaModel
             Call ShowSettings
             
         Case "0"

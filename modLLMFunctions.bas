@@ -46,6 +46,22 @@ Public Function prompt(promptText As String, Optional provider As String = "", O
     Debug.Print "[PROMPT] Model: '" & model & "'"
     Debug.Print "[PROMPT] BaseURL: '" & baseURL & "'"
     Debug.Print "[PROMPT] Prompt: '" & Left(promptText, 100) & "'"
+
+    If model = "" Then
+        ' Try to auto-detect a valid model
+        Dim availableModels As String
+        availableModels = LIST_MODELS(provider)
+        If InStr(availableModels, CurrentModel) > 0 Then
+            model = CurrentModel
+        ElseIf availableModels <> "" Then
+            ' Use first available model
+            model = Split(Split(availableModels, vbCrLf)(0), "|")(0)
+            Debug.Print "[PROMPT] Auto-selected model: " & model
+        Else
+            prompt = "Error: No valid model available for " & provider
+            Exit Function
+        End If
+    End If
     
     If baseURL = "" Then
         prompt = "Error: Invalid provider"
@@ -117,61 +133,76 @@ End Function
 ' List models
 Public Function LIST_MODELS(Optional provider As String = "") As String
     On Error GoTo ErrorHandler
-    
+
+    ' Ensure configuration is loaded
     If CurrentProvider = "" Then Call LoadConfig
     If provider = "" Then provider = CurrentProvider
     provider = LCase(Trim(provider))
-    
-    Dim baseURL As String
-    Dim apiKey As String
-    Dim endpoint As String
-    Dim response As String
-    Dim models As String
-    
+
+    Dim baseURL As String, apiKey As String, endpoint As String
+    Dim response As String, models As String
+
     baseURL = GetBaseURL(provider)
     apiKey = GetAPIKey(provider)
-    
+
+    ' Validation checks
     If baseURL = "" Then
         LIST_MODELS = "Error: Invalid provider"
         Exit Function
     End If
-    
+
     If apiKey = "" And provider <> "ollama" Then
         LIST_MODELS = "Error: No API key for " & provider
         Exit Function
     End If
-    
+
+    ' Determine endpoint
     Select Case provider
         Case "ollama": endpoint = baseURL & "/api/tags"
         Case Else: endpoint = baseURL & "/models"
     End Select
-    
+
+    ' Fetch data
     response = HTTPGet(endpoint, apiKey, provider)
-    
+
     If Left(response, 6) = "Error:" Then
         LIST_MODELS = response
         Exit Function
     End If
-    
+
+    ' CENTRALIZED FIX: Delegate all parsing to ParseModelList
     models = ParseModelList(response, provider)
-    
+
+    ' Final display formatting for Excel
     If Left(models, 6) <> "Error:" Then
-        LIST_MODELS = Replace(models, ", ", vbCrLf)
+        ' Convert internal pipes to newlines for the cell
+        LIST_MODELS = Replace(models, "|", vbCrLf)
     Else
         LIST_MODELS = models
     End If
-    
+
     Exit Function
-    
+
 ErrorHandler:
     LIST_MODELS = "Error: " & Err.Description
 End Function
 
 ' Config display
 Public Function LLM_CONFIG() As String
+    On Error Resume Next
     Application.Volatile
-    If CurrentProvider = "" Then Call LoadConfig
-    LLM_CONFIG = "Provider: " & CurrentProvider & " | Model: " & CurrentModel
+    
+    ' Force config reload if global variables are lost
+    If CurrentProvider = "" Or CurrentModel = "" Then 
+        Call LoadConfig 
+    End If
+    
+    ' If still empty after loading, provide a helpful status message
+    If CurrentProvider = "" Then
+        LLM_CONFIG = "Status: Not Configured (Run ShowSettings)"
+    Else
+        LLM_CONFIG = "Provider: " & CurrentProvider & " | Model: " & CurrentModel 
+    End If
 End Function
 
 ' Test curl
@@ -212,6 +243,7 @@ Public Function TestCurl() As String
 End Function
 
 ' HTTP POST
+' HTTP POST - FIXED VERSION
 Private Function HTTPPost(url As String, jsonBody As String, Optional apiKey As String = "", Optional provider As String = "") As String
     On Error GoTo ErrorHandler
     
@@ -221,6 +253,9 @@ Private Function HTTPPost(url As String, jsonBody As String, Optional apiKey As 
     Dim result As String
     Dim waitCount As Integer
     Dim fileNum As Integer
+    Dim lastSize As Long
+    Dim currentSize As Long
+    Dim stableCount As Integer
     
     If IsMac() Then
         bodyFile = Environ("TMPDIR") & "llm_body_" & Format(Now, "hhnnss") & ".json"
@@ -241,7 +276,7 @@ Private Function HTTPPost(url As String, jsonBody As String, Optional apiKey As 
         curlCmd = "curl -s -X POST '" & url & "' -H 'Content-Type: application/json'"
         If apiKey <> "" Then curlCmd = curlCmd & " -H 'Authorization: Bearer " & apiKey & "'"
         If LCase(provider) = "openrouter" Then curlCmd = curlCmd & " -H 'HTTP-Referer: https://excel-addin'"
-        curlCmd = curlCmd & " --data-binary '@" & bodyFile & "' --max-time 60 -o '" & outputFile & "' 2>&1 &"
+        curlCmd = curlCmd & " --data-binary '@" & bodyFile & "' --max-time 60 -o '" & outputFile & "' 2>&1"
         MacScript "do shell script """ & curlCmd & """"
     Else
         curlCmd = "curl -s -X POST """ & url & """ -H ""Content-Type: application/json"""
@@ -251,7 +286,7 @@ Private Function HTTPPost(url As String, jsonBody As String, Optional apiKey As 
         Shell "cmd /c " & curlCmd, vbHide
     End If
     
-    ' Wait for response
+    ' Wait for file to be created
     waitCount = 0
     Do While Dir(outputFile) = "" And waitCount < 60
         Application.Wait Now + TimeValue("00:00:01")
@@ -259,11 +294,33 @@ Private Function HTTPPost(url As String, jsonBody As String, Optional apiKey As 
     Loop
     
     If Dir(outputFile) = "" Then
-        HTTPPost = "Error: Timeout"
+        HTTPPost = "Error: Timeout - no response file"
         GoTo Cleanup
     End If
     
-    Application.Wait Now + TimeValue("00:00:02")
+    ' NEW: Wait for file size to stabilize (curl finished writing)
+    lastSize = -1
+    stableCount = 0
+    waitCount = 0
+    Do While stableCount < 3 And waitCount < 30
+        On Error Resume Next
+        currentSize = FileLen(outputFile)
+        On Error GoTo ErrorHandler
+        
+        If currentSize = lastSize And currentSize > 0 Then
+            stableCount = stableCount + 1
+        Else
+            stableCount = 0
+            lastSize = currentSize
+        End If
+        
+        Application.Wait Now + TimeValue("00:00:01")
+        waitCount = waitCount + 1
+    Loop
+    
+    ' Additional safety wait
+    Application.Wait Now + TimeValue("00:00:01")
+    
     result = ReadFile(outputFile)
     
     If result = "" Then
@@ -332,70 +389,26 @@ ErrorHandler:
 End Function
 
 ' Read file with encoding conversion
+' Read file - SIMPLIFIED VERSION
 Private Function ReadFile(filePath As String) As String
     On Error GoTo ErrorHandler
     
-    Dim result As String
     Dim fileNum As Integer
-    Dim line As String
+    Dim fileContent As String
     
-    If IsMac() Then
-        ' Try iconv conversion
-        Dim convertedFile As String
-        Dim convCmd As String
-        
-        convertedFile = filePath & ".conv"
-        convCmd = "iconv -f UTF-8 -t MACROMAN '" & filePath & "' > '" & convertedFile & "' 2>/dev/null"
-        
-        On Error Resume Next
-        MacScript "do shell script """ & convCmd & """"
-        Application.Wait Now + TimeValue("00:00:01")
-        On Error GoTo ErrorHandler
-        
-        If Dir(convertedFile) <> "" Then
-            fileNum = FreeFile
-            Open convertedFile For Input As #fileNum
-            result = ""
-            Do While Not EOF(fileNum)
-                Line Input #fileNum, line
-                result = result & line & vbCrLf
-            Loop
-            Close #fileNum
-            
-            On Error Resume Next
-            Kill convertedFile
-            On Error GoTo ErrorHandler
-            
-            ReadFile = Trim(result)
-            Exit Function
-        End If
-    End If
-    
-    ' Fallback: normal read
+    ' Read the entire file at once
     fileNum = FreeFile
-    Open filePath For Input As #fileNum
-    result = ""
-    Do While Not EOF(fileNum)
-        Line Input #fileNum, line
-        result = result & line & vbCrLf
-    Loop
+    Open filePath For Binary As #fileNum
+    fileContent = Space$(LOF(fileNum))
+    Get #fileNum, , fileContent
     Close #fileNum
     
-    ReadFile = Trim(result)
+    ReadFile = fileContent
     Exit Function
     
 ErrorHandler:
-    ' Ultimate fallback
-    Dim fn As Integer, ln As String, rs As String
-    fn = FreeFile
-    Open filePath For Input As #fn
-    rs = ""
-    Do While Not EOF(fn)
-        Line Input #fn, ln
-        rs = rs & ln & vbCrLf
-    Loop
-    Close #fn
-    ReadFile = Trim(rs)
+    If fileNum > 0 Then Close #fileNum
+    ReadFile = ""
 End Function
 
 ' Fix encoding issues
@@ -425,28 +438,44 @@ Private Function FixEncoding(text As String) As String
 End Function
 
 ' Parse JSON content - WITH FULL DEBUG
+' Parse JSON content - UPDATED VERSION
 Private Function ParseJSONContent(jsonText As String, Optional provider As String = "") As String
     On Error GoTo ErrorHandler
-    
+
     Debug.Print "[Parse] ========================================="
     Debug.Print "[Parse] Provider: '" & provider & "'"
     Debug.Print "[Parse] JSON Length: " & Len(jsonText)
     Debug.Print "[Parse] JSON Preview (first 300 chars): " & Left(jsonText, 300)
-    
+
+    ' First check for error response
+    If InStr(jsonText, """error"":") > 0 Then
+        Dim errorStart As Long, errorEnd As Long
+        errorStart = InStr(jsonText, """error"":""") + 9
+        If errorStart > 9 Then
+            errorEnd = InStr(errorStart, jsonText, """")
+            If errorEnd > errorStart Then
+                ParseJSONContent = "Error: " & Mid(jsonText, errorStart, errorEnd - errorStart)
+                Debug.Print "[Parse] *** Detected error response: " & ParseJSONContent
+                Debug.Print "[Parse] ========================================="
+                Exit Function
+            End If
+        End If
+    End If
+
     Dim startPos As Long, endPos As Long, content As String
-    
+
     ' Try Ollama format first
     If LCase(Trim(provider)) = "ollama" Then
         Debug.Print "[Parse] Looking for Ollama format..."
         startPos = InStr(jsonText, """message""")
         Debug.Print "[Parse] Found 'message' at position: " & startPos
-        
+
         If startPos > 0 Then
             startPos = InStr(startPos, jsonText, """content"":""")
             Debug.Print "[Parse] Found 'content' at position: " & startPos
         End If
     End If
-    
+
     ' Try standard format
     If startPos = 0 Then
         Debug.Print "[Parse] Looking for standard format..."
@@ -456,12 +485,12 @@ Private Function ParseJSONContent(jsonText As String, Optional provider As Strin
         End If
         Debug.Print "[Parse] Found 'content' at position: " & startPos
     End If
-    
+
     If startPos > 0 Then
         startPos = InStr(startPos, jsonText, ":""") + 2
         Debug.Print "[Parse] Content starts at position: " & startPos
         endPos = startPos
-        
+
         ' Find closing quote
         Do While endPos < Len(jsonText)
             endPos = InStr(endPos + 1, jsonText, """")
@@ -474,19 +503,19 @@ Private Function ParseJSONContent(jsonText As String, Optional provider As Strin
                 Exit Do
             End If
         Loop
-        
+
         If endPos > startPos Then
             content = Mid(jsonText, startPos, endPos - startPos)
             Debug.Print "[Parse] Extracted content length: " & Len(content)
             Debug.Print "[Parse] Raw content: " & Left(content, 150)
-            
+
             ' Unescape JSON
             content = Replace(content, "\n", vbCrLf)
             content = Replace(content, "\r", vbCr)
             content = Replace(content, "\t", vbTab)
             content = Replace(content, "\""", """")
             content = Replace(content, "\\", "\")
-            
+
             ParseJSONContent = content
             Debug.Print "[Parse] *** SUCCESS! Final content: " & Left(content, 100)
         Else
@@ -494,15 +523,15 @@ Private Function ParseJSONContent(jsonText As String, Optional provider As Strin
             Debug.Print "[Parse] *** " & ParseJSONContent
         End If
     Else
-        ParseJSONContent = "Error: No content found in JSON"
+        ' If no content found, return the raw JSON for debugging
+        ParseJSONContent = "Error: No content found in JSON. Raw response: " & jsonText
         Debug.Print "[Parse] *** " & ParseJSONContent
-        Debug.Print "[Parse] Full JSON: " & jsonText
     End If
-    
+
     Debug.Print "[Parse] ========================================="
-    
+
     Exit Function
-    
+
 ErrorHandler:
     ParseJSONContent = "Error: " & Err.Number & " - " & Err.Description
     Debug.Print "[Parse] *** EXCEPTION: " & ParseJSONContent
@@ -511,56 +540,96 @@ End Function
 ' Parse model list
 Private Function ParseModelList(jsonText As String, provider As String) As String
     On Error GoTo ErrorHandler
-    
+
     Dim models As String, startPos As Long, endPos As Long
     Dim modelId As String, count As Integer
-    
+    Dim i As Long, jsonLen As Long
+    Dim inQuotes As Boolean, prevChar As String
+
     models = ""
-    startPos = 1
     count = 0
     provider = LCase(Trim(provider))
-    
+    jsonLen = Len(jsonText)
+
     Select Case provider
         Case "ollama"
+            ' Standard Ollama /api/tags parsing
+            startPos = 1
             Do While True
                 startPos = InStr(startPos, jsonText, """name"":""")
                 If startPos = 0 Then Exit Do
                 startPos = startPos + 8
                 endPos = InStr(startPos, jsonText, """")
                 If endPos = 0 Then Exit Do
-                
+
                 modelId = Mid(jsonText, startPos, endPos - startPos)
-                If models <> "" Then models = models & ", "
+                
+                ' Fix: Multi-line If block for syntax compatibility
+                If models <> "" Then
+                    models = models & "|"
+                End If
                 models = models & modelId
-                count = count + 1
+
                 startPos = endPos + 1
             Loop
+
+            ' Alternative parsing fallback
+            If models = "" Then
+                startPos = 1
+                inQuotes = False
+                modelId = ""
+                For i = 1 To jsonLen
+                    prevChar = Mid(jsonText, i, 1)
+                    If prevChar = """" Then
+                        If inQuotes Then
+                            If modelId <> "" And (InStr(modelId, ":") > 0 Or InStr(modelId, "-") > 0) Then
+                                ' Fix: Standardize delimiter block
+                                If models <> "" Then
+                                    models = models & "|"
+                                End If
+                                models = models & modelId
+                            End If
+                            modelId = ""
+                        End If
+                        inQuotes = Not inQuotes
+                    ElseIf inQuotes Then
+                        modelId = modelId & prevChar
+                    End If
+                Next i
+            End If
+
         Case Else
+            ' Standard API (OpenAI, Mistral, etc.)
+            startPos = 1
             Do While True
                 startPos = InStr(startPos, jsonText, """id"":""")
                 If startPos = 0 Then Exit Do
                 startPos = startPos + 6
                 endPos = InStr(startPos, jsonText, """")
                 If endPos = 0 Then Exit Do
-                
+
                 modelId = Mid(jsonText, startPos, endPos - startPos)
-                If models <> "" Then models = models & ", "
+                
+                ' Fix: Explicit block for standard API delimiters
+                If models <> "" Then
+                    models = models & "|"
+                End If
                 models = models & modelId
-                count = count + 1
+                
                 startPos = endPos + 1
             Loop
     End Select
-    
+
     If models = "" Then
-        ParseModelList = "Error: No models found"
+        ParseModelList = "Error: No models found" 
     Else
         ParseModelList = models
     End If
-    
     Exit Function
-    
+
 ErrorHandler:
-    ParseModelList = "Error: " & Err.Description
+    ParseModelList = "Error: " & Err.Description 
+    
 End Function
 
 ' Escape JSON
