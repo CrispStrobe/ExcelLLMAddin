@@ -225,10 +225,18 @@ function parseErrorMessage(text: string): string | undefined {
 
 function errorMessage(err: unknown): string {
   if (typeof err === "string") return err;
-  if (err && typeof err === "object") {
-    const m = (err as any).message;
-    if (typeof m === "string") return m;
-    return JSON.stringify(err);
+  if (!err || typeof err !== "object") return "Unknown error";
+  const e = err as any;
+  let msg = typeof e.message === "string" ? e.message : JSON.stringify(err);
+  // Gateways like OpenRouter wrap the real upstream reason in error.metadata
+  // (e.g. "Provider returned error" with the actual cause in metadata.raw).
+  const meta = e.metadata;
+  if (meta) {
+    const raw = meta.raw;
+    const detail = typeof raw === "string" ? raw : raw ? JSON.stringify(raw) : undefined;
+    if (detail && !msg.includes(detail)) msg += ` — ${detail}`;
+    else if (typeof meta.provider_name === "string") msg += ` (via ${meta.provider_name})`;
   }
-  return "Unknown error";
+  if (e.code != null && !msg.includes(String(e.code))) msg += ` [${e.code}]`;
+  return msg;
 }

@@ -61,6 +61,13 @@ describe("runPrompt", () => {
     await expect(runPrompt("x", ollama, deps)).rejects.toThrow("model not found");
   });
 
+  test("surfaces gateway metadata (OpenRouter) in the error", async () => {
+    const { deps } = mockFetch(
+      `{"error":{"message":"Provider returned error","code":429,"metadata":{"raw":"rate-limited by upstream","provider_name":"Together"}}}`
+    );
+    await expect(runPrompt("x", openai, deps)).rejects.toThrow(/rate-limited by upstream/);
+  });
+
   test("http !ok surfaces the body's error message", async () => {
     const { deps } = mockFetch(`{"error":{"message":"rate limited"}}`, { ok: false, status: 429 });
     await expect(runPrompt("x", openai, deps)).rejects.toThrow("rate limited");
