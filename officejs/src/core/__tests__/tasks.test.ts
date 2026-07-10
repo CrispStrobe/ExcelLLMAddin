@@ -61,17 +61,31 @@ describe("extract / translate / summarize", () => {
 });
 
 describe("mapRange", () => {
-  test("preserves shape, skips empty cells, fills the rest", async () => {
-    const { deps, calls } = mockFetch("X");
-    const out = await mapRange([["a", "b"], ["", "c"]], "uppercase", settings, deps, 2);
-    expect(out).toEqual([["X", "X"], ["", "X"]]);
-    expect(calls.length).toBe(3); // the empty cell made no call
+  test("batches multiple cells into a single call", async () => {
+    const { deps, calls } = mockFetch(`["A","B","C"]`);
+    const out = await mapRange([["a", "b", "c"]], "uppercase", settings, deps);
+    expect(out).toEqual([["A", "B", "C"]]);
+    expect(calls.length).toBe(1); // one batched call, not three
   });
 
-  test("coerces non-string cells and passes the instruction", async () => {
+  test("preserves shape and skips empty cells", async () => {
+    const { deps } = mockFetch(`["A","C"]`);
+    const out = await mapRange([["a", ""], ["", "c"]], "up", settings, deps);
+    expect(out).toEqual([["A", ""], ["", "C"]]);
+  });
+
+  test("falls back to per-cell when the batch reply isn't a JSON array", async () => {
+    const { deps, calls } = mockFetch("X");
+    const out = await mapRange([["a", "b"]], "up", settings, deps);
+    expect(out).toEqual([["X", "X"]]);
+    expect(calls.length).toBe(3); // 1 batch attempt + 2 per-cell fallback
+  });
+
+  test("batchSize 1 does per-cell calls and coerces non-strings", async () => {
     const { deps, calls } = mockFetch("R");
-    const out = await mapRange([[42, true]], "describe", settings, deps, 4);
+    const out = await mapRange([[42, true]], "describe", settings, deps, { batchSize: 1 });
     expect(out).toEqual([["R", "R"]]);
+    expect(calls.length).toBe(2);
     expect(JSON.parse(calls[0].init.body).messages[1].content).toContain("describe");
   });
 });

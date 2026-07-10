@@ -132,7 +132,7 @@ export async function summarizeFn(text: string, maxWords?: number): Promise<stri
 
 /**
  * Applies an instruction to every cell of a range, spilling the results.
- * Note: this makes one model call per non-empty cell.
+ * Cells are batched into few calls (with a per-cell fallback) to keep it fast.
  * @customfunction MAP
  * @param range The range of input values.
  * @param instruction The instruction to apply to each cell.

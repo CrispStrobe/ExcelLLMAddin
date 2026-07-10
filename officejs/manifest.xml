@@ -6,7 +6,7 @@
   xmlns:ov="http://schemas.microsoft.com/office/taskpaneappversionoverrides"
   xsi:type="TaskPaneApp">
 
-  <Id>b1c2d3e4-f5a6-4b7c-8d9e-0a1b2c3d4e5f</Id>
+  <Id>fb886658-68fe-4712-90d5-0cf1c32e4913</Id>
   <Version>1.0.0.0</Version>
   <ProviderName>ExcelLLM</ProviderName>
   <DefaultLocale>en-US</DefaultLocale>

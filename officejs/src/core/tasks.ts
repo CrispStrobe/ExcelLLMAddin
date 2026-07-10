@@ -74,21 +74,32 @@ export async function summarize(
   return out.trim();
 }
 
+export interface MapOptions {
+  /** Number of chunks processed concurrently. */
+  concurrency?: number;
+  /** Cells per model call. >1 batches (one call returns a JSON array). */
+  batchSize?: number;
+}
+
 /**
  * Apply an instruction to every non-empty cell of a 2D range, preserving shape.
- * Runs with bounded concurrency. Empty cells pass through as empty strings;
- * per-cell failures become "Error: …" in that cell without failing the batch.
+ * Cells are batched (batchSize per call) to cut cost/latency: each call asks for
+ * a JSON array of results. If the array doesn't line up (wrong length / not
+ * JSON), that chunk falls back to reliable per-cell calls. Empty cells pass
+ * through; per-cell failures become "Error: …" without failing the whole batch.
  */
 export async function mapRange(
   values: unknown[][],
   instruction: string,
   settings: LlmSettings,
   deps: Deps,
-  concurrency = 4
+  options: MapOptions = {}
 ): Promise<string[][]> {
+  const batchSize = Math.max(1, options.batchSize ?? 20);
+  const concurrency = Math.max(1, options.concurrency ?? 4);
+
   const result: string[][] = values.map((row) => row.map(() => ""));
   const jobs: Array<{ r: number; c: number; text: string }> = [];
-
   for (let r = 0; r < values.length; r++) {
     for (let c = 0; c < values[r].length; c++) {
       const cell = values[r][c];
@@ -97,24 +108,94 @@ export async function mapRange(
     }
   }
 
-  const system =
-    "Apply the user's instruction to the single input value. " +
-    "Output only the result for that value, as plain text.";
-
-  await runPool(jobs, concurrency, async (job) => {
-    try {
-      const out = await runPrompt(
-        `Instruction: ${instruction}\n\nInput: ${job.text}`,
-        withSystem(settings, system),
-        deps
-      );
-      result[job.r][job.c] = out.trim();
-    } catch (e) {
-      result[job.r][job.c] = "Error: " + (e instanceof Error ? e.message : String(e));
-    }
+  const chunks = chunkArray(jobs, batchSize);
+  await runPool(chunks, concurrency, async (group) => {
+    const outputs = await mapChunk(group.map((j) => j.text), instruction, settings, deps);
+    group.forEach((j, i) => {
+      result[j.r][j.c] = outputs[i];
+    });
   });
 
   return result;
+}
+
+async function mapOne(
+  text: string,
+  instruction: string,
+  settings: LlmSettings,
+  deps: Deps
+): Promise<string> {
+  const system =
+    "Apply the user's instruction to the single input value. " +
+    "Output only the result for that value, as plain text.";
+  const out = await runPrompt(
+    `Instruction: ${instruction}\n\nInput: ${text}`,
+    withSystem(settings, system),
+    deps
+  );
+  return out.trim();
+}
+
+async function mapChunk(
+  inputs: string[],
+  instruction: string,
+  settings: LlmSettings,
+  deps: Deps
+): Promise<string[]> {
+  if (inputs.length === 1) {
+    try {
+      return [await mapOne(inputs[0], instruction, settings, deps)];
+    } catch (e) {
+      return ["Error: " + errMsg(e)];
+    }
+  }
+
+  const system =
+    "Apply the instruction to each numbered input. Return ONLY a JSON array of " +
+    "strings — exactly one result per input, in the same order, no commentary or code fences.";
+  const numbered = inputs.map((t, i) => `${i + 1}. ${t}`).join("\n");
+  const user =
+    `Instruction: ${instruction}\n\nInputs:\n${numbered}\n\n` +
+    `Return a JSON array of exactly ${inputs.length} strings.`;
+
+  try {
+    const raw = await runPrompt(user, withSystem(settings, system), deps);
+    const arr = parseStringArray(raw);
+    if (arr && arr.length === inputs.length) return arr.map((v) => v.trim());
+  } catch {
+    /* fall through to per-cell */
+  }
+
+  // Fallback: reliable, order-safe per-cell calls.
+  return Promise.all(
+    inputs.map((t) => mapOne(t, instruction, settings, deps).catch((e) => "Error: " + errMsg(e)))
+  );
+}
+
+function parseStringArray(raw: string): string[] | null {
+  let s = raw.trim();
+  const fence = s.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (fence) s = fence[1].trim();
+  const start = s.indexOf("[");
+  const end = s.lastIndexOf("]");
+  if (start === -1 || end <= start) return null;
+  try {
+    const parsed = JSON.parse(s.slice(start, end + 1));
+    if (!Array.isArray(parsed)) return null;
+    return parsed.map((v) => (v == null ? "" : typeof v === "string" ? v : JSON.stringify(v)));
+  } catch {
+    return null;
+  }
+}
+
+function chunkArray<T>(arr: T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+  return out;
+}
+
+function errMsg(e: unknown): string {
+  return e instanceof Error ? e.message : String(e);
 }
 
 // ---- helpers ----------------------------------------------------------------
