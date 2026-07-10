@@ -19,8 +19,14 @@ import {
 } from "../core/tasks";
 import { loadSettings } from "../core/config";
 import { browserFetch as fetchLike } from "../browserFetch";
+import { createLruCache } from "../core/cache";
 
 /* global CustomFunctions */
+
+// Shared deps for all custom functions. The session cache means identical
+// (provider, model, prompt) calls don't re-hit the API on every Excel recalc;
+// errors are never cached. It resets when the functions runtime reloads.
+const deps = { fetch: fetchLike, cache: createLruCache(500) };
 
 async function currentSettings(provider?: string, model?: string): Promise<LlmSettings> {
   const s = await loadSettings();
@@ -49,7 +55,7 @@ function errorText(e: unknown): string {
  */
 export async function prompt(text: string, provider?: string, model?: string): Promise<string> {
   try {
-    return await runPrompt(text, await currentSettings(provider, model), { fetch: fetchLike });
+    return await runPrompt(text, await currentSettings(provider, model), deps);
   } catch (e) {
     return errorText(e);
   }
@@ -63,7 +69,7 @@ export async function prompt(text: string, provider?: string, model?: string): P
  */
 export async function listModelsFn(provider?: string): Promise<string[][]> {
   try {
-    const models = await listModels(await currentSettings(provider), { fetch: fetchLike });
+    const models = await listModels(await currentSettings(provider), deps);
     return models.length ? models.map((m) => [m]) : [["(no models)"]];
   } catch (e) {
     return [[errorText(e)]];
@@ -89,7 +95,7 @@ export async function config(): Promise<string> {
  */
 export async function classifyFn(text: string, categories: string[][]): Promise<string> {
   try {
-    return await classify(text, flatten(categories), await currentSettings(), { fetch: fetchLike });
+    return await classify(text, flatten(categories), await currentSettings(), deps);
   } catch (e) {
     return errorText(e);
   }
@@ -104,7 +110,7 @@ export async function classifyFn(text: string, categories: string[][]): Promise<
  */
 export async function extractFn(text: string, instruction: string): Promise<string> {
   try {
-    return await extract(text, instruction, await currentSettings(), { fetch: fetchLike });
+    return await extract(text, instruction, await currentSettings(), deps);
   } catch (e) {
     return errorText(e);
   }
@@ -119,7 +125,7 @@ export async function extractFn(text: string, instruction: string): Promise<stri
  */
 export async function translateFn(text: string, targetLanguage: string): Promise<string> {
   try {
-    return await translate(text, targetLanguage, await currentSettings(), { fetch: fetchLike });
+    return await translate(text, targetLanguage, await currentSettings(), deps);
   } catch (e) {
     return errorText(e);
   }
@@ -134,7 +140,7 @@ export async function translateFn(text: string, targetLanguage: string): Promise
  */
 export async function summarizeFn(text: string, maxWords?: number): Promise<string> {
   try {
-    return await summarize(text, maxWords, await currentSettings(), { fetch: fetchLike });
+    return await summarize(text, maxWords, await currentSettings(), deps);
   } catch (e) {
     return errorText(e);
   }
@@ -150,7 +156,7 @@ export async function summarizeFn(text: string, maxWords?: number): Promise<stri
  */
 export async function mapFn(range: string[][], instruction: string): Promise<string[][]> {
   try {
-    return await mapRange(range, instruction, await currentSettings(), { fetch: fetchLike });
+    return await mapRange(range, instruction, await currentSettings(), deps);
   } catch (e) {
     return [[errorText(e)]];
   }
@@ -178,7 +184,7 @@ function flatten(grid: string[][]): string[] {
  */
 export async function sentimentFn(text: string): Promise<string> {
   try {
-    return await sentiment(text, await currentSettings(), { fetch: fetchLike });
+    return await sentiment(text, await currentSettings(), deps);
   } catch (e) {
     return errorText(e);
   }
@@ -193,7 +199,7 @@ export async function sentimentFn(text: string): Promise<string> {
  */
 export async function listFn(prompt: string, count?: number): Promise<string[][]> {
   try {
-    const items = await listItems(prompt, count, await currentSettings(), { fetch: fetchLike });
+    const items = await listItems(prompt, count, await currentSettings(), deps);
     return items.length ? items.map((i) => [i]) : [["(no items)"]];
   } catch (e) {
     return [[errorText(e)]];
@@ -209,7 +215,7 @@ export async function listFn(prompt: string, count?: number): Promise<string[][]
  */
 export async function fieldsFn(text: string, fields: string[][]): Promise<string[][]> {
   try {
-    const values = await extractFields(text, flatten(fields), await currentSettings(), { fetch: fetchLike });
+    const values = await extractFields(text, flatten(fields), await currentSettings(), deps);
     return [values.length ? values : ["(no fields)"]];
   } catch (e) {
     return [[errorText(e)]];
@@ -228,7 +234,7 @@ export async function askFn(question: string, context: string[][]): Promise<stri
     const ctx = (context || [])
       .map((row) => (row || []).map((c) => String(c ?? "")).join("\t"))
       .join("\n");
-    return await ask(question, ctx, await currentSettings(), { fetch: fetchLike });
+    return await ask(question, ctx, await currentSettings(), deps);
   } catch (e) {
     return errorText(e);
   }

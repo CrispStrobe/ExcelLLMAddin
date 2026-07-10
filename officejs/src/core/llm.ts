@@ -46,8 +46,17 @@ export type FetchLike = (
   text: () => Promise<string>;
 }>;
 
+/** Optional response cache. get returns undefined on a miss. */
+export interface LlmCache {
+  get(key: string): string | undefined;
+  set(key: string, value: string): void;
+  clear?(): void;
+}
+
 export interface Deps {
   fetch: FetchLike;
+  /** If present, successful prompt results are served/stored here. */
+  cache?: LlmCache;
 }
 
 export const DEFAULT_SYSTEM_PROMPT =
@@ -61,28 +70,42 @@ export async function runPrompt(
 ): Promise<string> {
   const spec = requireProvider(settings.provider);
 
+  const cacheKey = deps.cache ? promptCacheKey(settings, promptText) : "";
+  if (deps.cache) {
+    const hit = deps.cache.get(cacheKey);
+    if (hit !== undefined) return hit;
+  }
+
+  let result: string;
   if (settings.proxyUrl) {
     const data = await callProxy("chat", promptText, settings, spec, deps);
-    return String(data.content ?? "");
+    result = String(data.content ?? "");
+  } else {
+    const baseUrl = settings.baseUrl || spec.defaultBaseUrl;
+    if (spec.requiresKey && !settings.apiKey) {
+      throw new LlmError(`No API key configured for ${spec.label}.`);
+    }
+    const url = chatEndpoint(spec, baseUrl);
+    const body = buildChatBody(spec, settings.model, promptText, settings.systemPrompt);
+    const resp = await deps.fetch(url, {
+      method: "POST",
+      headers: directHeaders(spec, settings.apiKey),
+      body: JSON.stringify(body),
+    });
+    const text = await resp.text();
+    if (!resp.ok) {
+      throw new LlmError(parseErrorMessage(text) ?? `HTTP ${resp.status} from ${url}`);
+    }
+    result = extractChatContent(text);
   }
 
-  const baseUrl = settings.baseUrl || spec.defaultBaseUrl;
-  if (spec.requiresKey && !settings.apiKey) {
-    throw new LlmError(`No API key configured for ${spec.label}.`);
-  }
+  // Only successful results reach here (errors throw above), so errors aren't cached.
+  if (deps.cache) deps.cache.set(cacheKey, result);
+  return result;
+}
 
-  const url = chatEndpoint(spec, baseUrl);
-  const body = buildChatBody(spec, settings.model, promptText, settings.systemPrompt);
-  const resp = await deps.fetch(url, {
-    method: "POST",
-    headers: directHeaders(spec, settings.apiKey),
-    body: JSON.stringify(body),
-  });
-  const text = await resp.text();
-  if (!resp.ok) {
-    throw new LlmError(parseErrorMessage(text) ?? `HTTP ${resp.status} from ${url}`);
-  }
-  return extractChatContent(text);
+function promptCacheKey(settings: LlmSettings, promptText: string): string {
+  return JSON.stringify([settings.provider, settings.model, settings.systemPrompt ?? "", promptText]);
 }
 
 export async function listModels(

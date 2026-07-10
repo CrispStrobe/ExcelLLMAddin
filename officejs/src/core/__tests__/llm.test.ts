@@ -9,6 +9,7 @@ import {
   FetchLike,
 } from "../llm";
 import { PROVIDERS } from "../providers";
+import { createLruCache } from "../cache";
 
 /** A fetch double that returns a canned body and records requests. */
 function mockFetch(
@@ -139,6 +140,39 @@ describe("proxy transport", () => {
   test("proxy error surfaces", async () => {
     const { deps } = mockFetch(`{"error":"upstream down"}`, { ok: false, status: 502 });
     await expect(runPrompt("x", proxied, deps)).rejects.toThrow("upstream down");
+  });
+});
+
+describe("response cache", () => {
+  test("identical prompts hit the cache (one fetch)", async () => {
+    const { deps, calls } = mockFetch(`{"message":{"content":"Hi"}}`);
+    const cachedDeps = { ...deps, cache: createLruCache() };
+    expect(await runPrompt("x", ollama, cachedDeps)).toBe("Hi");
+    expect(await runPrompt("x", ollama, cachedDeps)).toBe("Hi");
+    expect(calls.length).toBe(1);
+  });
+
+  test("different prompts miss the cache", async () => {
+    const { deps, calls } = mockFetch(`{"message":{"content":"Hi"}}`);
+    const cachedDeps = { ...deps, cache: createLruCache() };
+    await runPrompt("a", ollama, cachedDeps);
+    await runPrompt("b", ollama, cachedDeps);
+    expect(calls.length).toBe(2);
+  });
+
+  test("errors are not cached (retried)", async () => {
+    const { deps, calls } = mockFetch(`{"error":"boom"}`);
+    const cachedDeps = { ...deps, cache: createLruCache() };
+    await expect(runPrompt("x", ollama, cachedDeps)).rejects.toThrow("boom");
+    await expect(runPrompt("x", ollama, cachedDeps)).rejects.toThrow("boom");
+    expect(calls.length).toBe(2);
+  });
+
+  test("no cache in deps means always fetch", async () => {
+    const { deps, calls } = mockFetch(`{"message":{"content":"Hi"}}`);
+    await runPrompt("x", ollama, deps);
+    await runPrompt("x", ollama, deps);
+    expect(calls.length).toBe(2);
   });
 });
 
