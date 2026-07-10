@@ -15,6 +15,7 @@ export function defaultSettings(): LlmSettings {
     proxyUrl: "",
     systemPrompt: "",
     embedModel: "",
+    mcpUrl: "",
   };
 }
 

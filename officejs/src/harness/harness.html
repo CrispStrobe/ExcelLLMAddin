@@ -41,6 +41,9 @@
         <label for="embedModel">Embedding model <span class="muted">(for =LLM.SIMILARITY)</span></label>
         <input id="embedModel" placeholder="e.g. Qwen/Qwen3-Embedding-8B" autocomplete="off" />
 
+        <label for="mcpUrl">MCP server URL <span class="muted">(adds remote tools to the agent)</span></label>
+        <input id="mcpUrl" placeholder="https://your-mcp-server/rpc" autocomplete="off" />
+
         <label for="systemPrompt">System prompt override</label>
         <textarea id="systemPrompt" rows="2" placeholder="(default)"></textarea>
       </details>

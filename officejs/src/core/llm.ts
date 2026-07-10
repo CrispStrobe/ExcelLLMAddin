@@ -34,6 +34,8 @@ export interface LlmSettings {
   systemPrompt?: string;
   /** Embedding model (for SIMILARITY); provider-specific, e.g. Nebius Qwen/Qwen3-Embedding-8B. */
   embedModel?: string;
+  /** Optional remote MCP server URL; its tools are added to the agent. */
+  mcpUrl?: string;
 }
 
 export type FetchLike = (

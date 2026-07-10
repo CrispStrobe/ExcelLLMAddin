@@ -4,6 +4,7 @@ import { loadSettings, saveSettings } from "../core/config";
 import { runPrompt, listModels, LlmSettings } from "../core/llm";
 import { runAgent, createApprovalExecutor, PendingAction, ToolExecutor } from "../core/agent";
 import { EXCEL_TOOLS, executeExcelTool, WRITE_TOOLS } from "../excelTools";
+import { connectMcp, browserMcpFetch } from "../mcp";
 import { browserFetch as fetchLike } from "../browserFetch";
 
 /* global Office, document, window */
@@ -42,19 +43,32 @@ async function onAgentRun(): Promise<void> {
     log.textContent = "Type an instruction first.";
     return;
   }
+  const settings = readForm();
   const auto = byId<HTMLInputElement>("agentAuto").checked;
   pending = [];
   applyBtn.style.display = "none";
   log.textContent = "Working…";
   try {
-    let executor: ToolExecutor = executeExcelTool;
+    let tools = EXCEL_TOOLS;
+    let base: ToolExecutor = executeExcelTool;
+
+    if (settings.mcpUrl) {
+      log.textContent = "Connecting to MCP server…";
+      const conn = await connectMcp({ url: settings.mcpUrl }, browserMcpFetch);
+      const mcpNames = new Set(conn.tools.map((t) => t.name));
+      tools = [...EXCEL_TOOLS, ...conn.tools];
+      base = async (name, args) => (mcpNames.has(name) ? conn.executor(name, args) : executeExcelTool(name, args));
+      log.textContent = `MCP: added ${conn.tools.length} tool(s). Working…`;
+    }
+
+    let executor: ToolExecutor = base;
     let queued: PendingAction[] = [];
     if (!auto) {
-      const wrapped = createApprovalExecutor(executeExcelTool, (n) => WRITE_TOOLS.has(n));
+      const wrapped = createApprovalExecutor(base, (n) => WRITE_TOOLS.has(n));
       executor = wrapped.executor;
       queued = wrapped.pending;
     }
-    const res = await runAgent(input, EXCEL_TOOLS, readForm(), { fetch: fetchLike }, executor);
+    const res = await runAgent(input, tools, settings, { fetch: fetchLike }, executor);
     const lines = res.steps.map((s) => `• ${s.tool}(${clip(JSON.stringify(s.args))}) → ${clip(s.result)}`);
     lines.push("", res.finalText || "(done)");
     log.textContent = lines.join("\n");
@@ -109,6 +123,7 @@ function setForm(s: LlmSettings): void {
   byId<HTMLInputElement>("baseUrl").value = s.baseUrl || "";
   byId<HTMLInputElement>("proxyUrl").value = s.proxyUrl || "";
   byId<HTMLInputElement>("embedModel").value = s.embedModel || "";
+  byId<HTMLInputElement>("mcpUrl").value = s.mcpUrl || "";
   byId<HTMLTextAreaElement>("systemPrompt").value = s.systemPrompt || "";
 }
 
@@ -120,6 +135,7 @@ function readForm(): LlmSettings {
     baseUrl: byId<HTMLInputElement>("baseUrl").value.trim(),
     proxyUrl: byId<HTMLInputElement>("proxyUrl").value.trim(),
     embedModel: byId<HTMLInputElement>("embedModel").value.trim(),
+    mcpUrl: byId<HTMLInputElement>("mcpUrl").value.trim(),
     systemPrompt: byId<HTMLTextAreaElement>("systemPrompt").value.trim(),
   };
 }
