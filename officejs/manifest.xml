@@ -26,7 +26,7 @@
 
   <Requirements>
     <Sets DefaultMinVersion="1.1">
-      <Set Name="CustomFunctionsRuntime" MinVersion="1.1"/>
+      <Set Name="SharedRuntime" MinVersion="1.1"/>
     </Sets>
   </Requirements>
 
@@ -39,13 +39,16 @@
   <VersionOverrides xmlns="http://schemas.microsoft.com/office/taskpaneappversionoverrides" xsi:type="VersionOverridesV1_0">
     <Hosts>
       <Host xsi:type="Workbook">
+        <Runtimes>
+          <Runtime resid="Taskpane.Url" lifetime="long"/>
+        </Runtimes>
         <AllFormFactors>
           <ExtensionPoint xsi:type="CustomFunctions">
             <Script>
-              <SourceLocation resid="Functions.Script.Url"/>
+              <SourceLocation resid="Taskpane.Url"/>
             </Script>
             <Page>
-              <SourceLocation resid="Functions.Page.Url"/>
+              <SourceLocation resid="Taskpane.Url"/>
             </Page>
             <Metadata>
               <SourceLocation resid="Functions.Metadata.Url"/>

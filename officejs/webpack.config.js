@@ -71,7 +71,9 @@ module.exports = async (env, options) => {
       new HtmlWebpackPlugin({
         filename: "taskpane.html",
         template: "./src/taskpane/taskpane.html",
-        chunks: ["taskpane"],
+        // Shared runtime: the task-pane page also hosts the custom functions, so
+        // both bundles load here and the functions register in the same runtime.
+        chunks: ["functions", "taskpane"],
       }),
       new HtmlWebpackPlugin({
         filename: "functions.html",
