@@ -38,7 +38,18 @@ module.exports = async (env, options) => {
     },
     module: {
       rules: [
-        { test: /\.ts$/, use: "ts-loader", exclude: /node_modules/ },
+        {
+          test: /\.ts$/,
+          exclude: /node_modules/,
+          use: {
+            loader: "ts-loader",
+            // transpileOnly: don't type-check during bundling. ts-loader's
+            // watch-mode incremental type checker produced phantom "Cannot find
+            // name" errors misattributed to the wrong files. Types are enforced
+            // separately by `npm run typecheck`, jest (ts-jest), and CI.
+            options: { transpileOnly: true },
+          },
+        },
         { test: /\.html$/, use: "html-loader" },
         { test: /\.css$/, use: ["style-loader", "css-loader"] },
         {
