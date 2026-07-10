@@ -18,7 +18,7 @@ const ALLOWED_ORIGIN = "*"; // tighten to your add-in origin in production
 const PROVIDERS = {
   openai: { baseUrl: "https://api.openai.com/v1", style: "openai", keyEnv: "OPENAI_API_KEY" },
   mistral: { baseUrl: "https://api.mistral.ai/v1", style: "openai", keyEnv: "MISTRAL_API_KEY" },
-  nebius: { baseUrl: "https://api.studio.nebius.ai/v1", style: "openai", keyEnv: "NEBIUS_API_KEY" },
+  nebius: { baseUrl: "https://api.studio.nebius.com/v1", style: "openai", keyEnv: "NEBIUS_API_KEY" },
   scaleway: { baseUrl: "https://api.scaleway.ai/v1", style: "openai", keyEnv: "SCALEWAY_API_KEY" },
   openrouter: { baseUrl: "https://openrouter.ai/api/v1", style: "openai", keyEnv: "OPENROUTER_API_KEY" },
   ollama: { baseUrl: "http://localhost:11434", style: "ollama", keyEnv: null },

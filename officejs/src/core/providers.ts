@@ -26,8 +26,9 @@ export const PROVIDERS: Record<string, ProviderSpec> = {
   },
   nebius: {
     id: "nebius", label: "Nebius",
-    defaultBaseUrl: "https://api.studio.nebius.ai/v1",
-    requiresKey: true, style: "openai", browserFriendly: false,
+    defaultBaseUrl: "https://api.studio.nebius.com/v1",
+    // Verified: Nebius returns access-control-allow-origin:* — works direct from the browser.
+    requiresKey: true, style: "openai", browserFriendly: true,
   },
   scaleway: {
     id: "scaleway", label: "Scaleway",

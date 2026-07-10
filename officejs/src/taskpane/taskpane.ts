@@ -60,8 +60,12 @@ function readForm(): LlmSettings {
 }
 
 async function onSave(): Promise<void> {
-  await saveSettings(readForm());
-  setStatus("Saved.", "ok");
+  try {
+    await saveSettings(readForm());
+    setStatus("Saved.", "ok");
+  } catch (e) {
+    setStatus(errText(e), "err");
+  }
 }
 
 async function onTest(): Promise<void> {

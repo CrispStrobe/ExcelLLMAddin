@@ -80,7 +80,7 @@ export async function runPrompt(
   });
   const text = await resp.text();
   if (!resp.ok) {
-    throw new LlmError(parseErrorMessage(text) ?? `HTTP ${resp.status}`);
+    throw new LlmError(parseErrorMessage(text) ?? `HTTP ${resp.status} from ${url}`);
   }
   return extractChatContent(text);
 }
@@ -108,7 +108,7 @@ export async function listModels(
   });
   const text = await resp.text();
   if (!resp.ok) {
-    throw new LlmError(parseErrorMessage(text) ?? `HTTP ${resp.status}`);
+    throw new LlmError(parseErrorMessage(text) ?? `HTTP ${resp.status} from ${url}`);
   }
   return extractModelList(spec, text);
 }

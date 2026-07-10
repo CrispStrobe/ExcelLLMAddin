@@ -104,6 +104,9 @@ module.exports = async (env, options) => {
       // memory. Pointing static at the build output collides with those in-memory
       // assets ("Multiple assets emit ... functions.json") and corrupts the build.
       static: false,
+      // Don't show the fullscreen overlay for cross-origin "Script error." runtime
+      // events (they come from office.js / the host, not our code).
+      client: { overlay: { errors: true, warnings: false, runtimeErrors: false } },
     },
   };
   return config;
