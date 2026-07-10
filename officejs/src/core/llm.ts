@@ -211,7 +211,7 @@ export function buildChatBody(
   return body;
 }
 
-function directHeaders(spec: ProviderSpec, apiKey?: string): Record<string, string> {
+export function directHeaders(spec: ProviderSpec, apiKey?: string): Record<string, string> {
   const h: Record<string, string> = { "Content-Type": "application/json" };
   if (apiKey) h["Authorization"] = `Bearer ${apiKey}`;
   if (spec.id === "openrouter") {

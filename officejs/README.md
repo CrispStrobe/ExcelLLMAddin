@@ -11,6 +11,7 @@ temp files, and none of the encoding pain of the legacy `.xlam`.
 ## What you get
 
 - `=LLM.PROMPT(text, [provider], [model])` — ask an LLM from a cell
+- `=LLM.STREAM(text, [provider], [model])` — like PROMPT, but streams into the cell live
 - `=LLM.CLASSIFY(text, categories)` — pick one label from a range/list
 - `=LLM.EXTRACT(text, instruction)` — pull a value out of text
 - `=LLM.TRANSLATE(text, language)` — translate a cell

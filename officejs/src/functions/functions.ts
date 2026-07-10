@@ -21,6 +21,7 @@ import {
 import { loadSettings } from "../core/config";
 import { browserFetch as fetchLike } from "../browserFetch";
 import { createLruCache } from "../core/cache";
+import { streamChat } from "../stream";
 
 /* global CustomFunctions */
 
@@ -261,7 +262,41 @@ export async function similarityFn(a: string, b: string, model?: string): Promis
   }
 }
 
+/**
+ * Streams the model's reply into the cell as it is generated.
+ * @customfunction STREAM
+ * @param text The prompt text (or a cell reference).
+ * @param provider Optional provider id.
+ * @param model Optional model name.
+ * @param invocation
+ * @returns The streamed reply.
+ */
+export function streamFn(
+  text: string,
+  provider: string,
+  model: string,
+  invocation: CustomFunctions.StreamingInvocation<string>
+): void {
+  let canceled = false;
+  invocation.onCanceled = () => {
+    canceled = true;
+  };
+  invocation.setResult("…");
+  (async () => {
+    try {
+      const s = await currentSettings(provider, model);
+      const full = await streamChat(text, s, (partial) => {
+        if (!canceled) invocation.setResult(partial);
+      });
+      if (!canceled) invocation.setResult(full || "(empty)");
+    } catch (e) {
+      if (!canceled) invocation.setResult(errorText(e));
+    }
+  })();
+}
+
 CustomFunctions.associate("PROMPT", prompt);
+CustomFunctions.associate("STREAM", streamFn);
 CustomFunctions.associate("LIST_MODELS", listModelsFn);
 CustomFunctions.associate("CONFIG", config);
 CustomFunctions.associate("CLASSIFY", classifyFn);
