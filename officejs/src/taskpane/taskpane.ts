@@ -18,13 +18,18 @@ Office.onReady((info) => {
   }
 });
 
+let allModels: string[] = [];
+
 async function init(): Promise<void> {
   populateProviders();
   setForm(await loadSettings());
   byId<HTMLButtonElement>("save").onclick = onSave;
   byId<HTMLButtonElement>("test").onclick = onTest;
   byId<HTMLButtonElement>("refreshModels").onclick = onRefreshModels;
-  byId<HTMLSelectElement>("provider").onchange = updateKeyHint;
+  byId<HTMLSelectElement>("provider").onchange = onProviderChange;
+  byId<HTMLInputElement>("modelFilter").oninput = () =>
+    renderModels(byId<HTMLInputElement>("modelFilter").value);
+  byId<HTMLSelectElement>("modelSelect").onchange = onPickModel;
   updateKeyHint();
 }
 
@@ -77,18 +82,41 @@ async function onTest(): Promise<void> {
 async function onRefreshModels(): Promise<void> {
   setStatus("Loading models…", "");
   try {
-    const models = await listModels(readForm(), { fetch: fetchLike });
-    const dl = byId<HTMLDataListElement>("modelList");
-    dl.innerHTML = "";
-    for (const m of models) {
-      const opt = document.createElement("option");
-      opt.value = m;
-      dl.appendChild(opt);
-    }
-    setStatus(`${models.length} model(s) loaded — click the model box.`, "ok");
+    allModels = await listModels(readForm(), { fetch: fetchLike });
+    byId<HTMLInputElement>("modelFilter").classList.remove("hidden");
+    byId<HTMLSelectElement>("modelSelect").classList.remove("hidden");
+    renderModels(byId<HTMLInputElement>("modelFilter").value);
+    setStatus(`${allModels.length} models — filter, then click one to select.`, "ok");
   } catch (e) {
     setStatus(errText(e), "err");
   }
+}
+
+function renderModels(filter: string): void {
+  const sel = byId<HTMLSelectElement>("modelSelect");
+  const f = filter.trim().toLowerCase();
+  const matches = f ? allModels.filter((m) => m.toLowerCase().includes(f)) : allModels;
+  sel.innerHTML = "";
+  for (const m of matches.slice(0, 500)) {
+    const opt = document.createElement("option");
+    opt.value = m;
+    opt.textContent = m;
+    sel.appendChild(opt);
+  }
+  sel.size = Math.min(8, Math.max(2, matches.length));
+}
+
+function onPickModel(): void {
+  const sel = byId<HTMLSelectElement>("modelSelect");
+  if (sel.value) byId<HTMLInputElement>("model").value = sel.value;
+}
+
+function onProviderChange(): void {
+  // Different provider -> different model catalog; hide the stale picker.
+  allModels = [];
+  byId<HTMLInputElement>("modelFilter").classList.add("hidden");
+  byId<HTMLSelectElement>("modelSelect").classList.add("hidden");
+  updateKeyHint();
 }
 
 function updateKeyHint(): void {

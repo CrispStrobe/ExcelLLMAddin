@@ -16,10 +16,11 @@
       <select id="provider"></select>
 
       <label for="model">Model
-        <button id="refreshModels" type="button" class="link">list</button>
+        <button id="refreshModels" type="button" class="link">load list</button>
       </label>
-      <input id="model" list="modelList" placeholder="e.g. gpt-4o-mini" />
-      <datalist id="modelList"></datalist>
+      <input id="model" placeholder="e.g. openai/gpt-4o-mini" autocomplete="off" />
+      <input id="modelFilter" class="hidden" placeholder="filter models…" autocomplete="off" />
+      <select id="modelSelect" class="hidden" size="6"></select>
 
       <label for="apiKey">API key <span class="muted">(not needed for Ollama or when using a proxy)</span></label>
       <input id="apiKey" type="password" placeholder="sk-…" autocomplete="off" />

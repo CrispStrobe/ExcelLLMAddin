@@ -83,6 +83,10 @@ button.link {
   font-weight: normal;
 }
 
+.hidden { display: none; }
+#modelFilter, #modelSelect { margin-top: 6px; }
+#modelSelect option { padding: 2px 4px; }
+
 .status { margin-top: 16px; min-height: 1.2em; white-space: pre-wrap; word-break: break-word; }
 .status.ok { color: var(--ok); }
 .status.err { color: var(--err); }
