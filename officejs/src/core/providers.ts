@@ -64,3 +64,8 @@ export function modelsEndpoint(spec: ProviderSpec, baseUrl: string): string {
   const base = trimTrailingSlash(baseUrl);
   return spec.style === "ollama" ? `${base}/api/tags` : `${base}/models`;
 }
+
+export function embeddingsEndpoint(spec: ProviderSpec, baseUrl: string): string {
+  const base = trimTrailingSlash(baseUrl);
+  return spec.style === "ollama" ? `${base}/api/embeddings` : `${base}/embeddings`;
+}

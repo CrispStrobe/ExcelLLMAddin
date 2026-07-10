@@ -14,6 +14,7 @@ export function defaultSettings(): LlmSettings {
     apiKey: "",
     proxyUrl: "",
     systemPrompt: "",
+    embedModel: "",
   };
 }
 

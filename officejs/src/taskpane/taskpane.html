@@ -33,6 +33,9 @@
         <label for="proxyUrl">Proxy URL <span class="muted">(recommended for cloud providers — keeps keys server-side)</span></label>
         <input id="proxyUrl" placeholder="https://your-proxy.example/api" />
 
+        <label for="embedModel">Embedding model <span class="muted">(for =LLM.SIMILARITY)</span></label>
+        <input id="embedModel" placeholder="e.g. Qwen/Qwen3-Embedding-8B" autocomplete="off" />
+
         <label for="systemPrompt">System prompt override</label>
         <textarea id="systemPrompt" rows="2" placeholder="(default)"></textarea>
       </details>

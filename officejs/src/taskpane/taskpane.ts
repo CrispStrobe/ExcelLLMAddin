@@ -45,6 +45,7 @@ function setForm(s: LlmSettings): void {
   byId<HTMLInputElement>("apiKey").value = s.apiKey || "";
   byId<HTMLInputElement>("baseUrl").value = s.baseUrl || "";
   byId<HTMLInputElement>("proxyUrl").value = s.proxyUrl || "";
+  byId<HTMLInputElement>("embedModel").value = s.embedModel || "";
   byId<HTMLTextAreaElement>("systemPrompt").value = s.systemPrompt || "";
 }
 
@@ -55,6 +56,7 @@ function readForm(): LlmSettings {
     apiKey: byId<HTMLInputElement>("apiKey").value.trim(),
     baseUrl: byId<HTMLInputElement>("baseUrl").value.trim(),
     proxyUrl: byId<HTMLInputElement>("proxyUrl").value.trim(),
+    embedModel: byId<HTMLInputElement>("embedModel").value.trim(),
     systemPrompt: byId<HTMLTextAreaElement>("systemPrompt").value.trim(),
   };
 }

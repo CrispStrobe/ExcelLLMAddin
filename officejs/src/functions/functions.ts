@@ -16,6 +16,7 @@ import {
   listItems,
   extractFields,
   ask,
+  similarity,
 } from "../core/tasks";
 import { loadSettings } from "../core/config";
 import { browserFetch as fetchLike } from "../browserFetch";
@@ -38,6 +39,7 @@ async function currentSettings(provider?: string, model?: string): Promise<LlmSe
     apiKey: s.apiKey || undefined,
     proxyUrl: s.proxyUrl || undefined,
     systemPrompt: s.systemPrompt || undefined,
+    embedModel: s.embedModel || undefined,
   };
 }
 
@@ -240,6 +242,25 @@ export async function askFn(question: string, context: string[][]): Promise<stri
   }
 }
 
+/**
+ * Semantic similarity of two texts (1 = same meaning), via embeddings.
+ * Uses the embedding model from LLM Settings unless one is given.
+ * @customfunction SIMILARITY
+ * @param a First text (or a cell reference).
+ * @param b Second text (or a cell reference).
+ * @param model Optional embedding model id.
+ * @returns Cosine similarity, typically 0..1.
+ */
+export async function similarityFn(a: string, b: string, model?: string): Promise<number | string> {
+  try {
+    const s = await currentSettings();
+    const m = (model && model.trim()) || s.embedModel || "";
+    return await similarity(a, b, m, s, deps);
+  } catch (e) {
+    return errorText(e);
+  }
+}
+
 CustomFunctions.associate("PROMPT", prompt);
 CustomFunctions.associate("LIST_MODELS", listModelsFn);
 CustomFunctions.associate("CONFIG", config);
@@ -252,3 +273,4 @@ CustomFunctions.associate("SENTIMENT", sentimentFn);
 CustomFunctions.associate("LIST", listFn);
 CustomFunctions.associate("FIELDS", fieldsFn);
 CustomFunctions.associate("ASK", askFn);
+CustomFunctions.associate("SIMILARITY", similarityFn);

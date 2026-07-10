@@ -69,6 +69,18 @@ export default {
     }
 
     try {
+      if (req.op === "embed") {
+        const url = spec.style === "ollama" ? `${baseUrl}/api/embeddings` : `${baseUrl}/embeddings`;
+        const body =
+          spec.style === "ollama" ? { model: req.model, prompt: req.prompt } : { model: req.model, input: req.prompt };
+        const r = await fetch(url, { method: "POST", headers, body: JSON.stringify(body) });
+        const data = await r.json();
+        if (data.error) return json({ error: errMsg(data.error) }, r.status || 502);
+        const emb = data.data?.[0]?.embedding ?? data.embedding ?? (data.embeddings && data.embeddings[0]);
+        if (!Array.isArray(emb)) return json({ error: "No embedding in provider response" }, 502);
+        return json({ embedding: emb });
+      }
+
       if (req.op === "models") {
         const url = spec.style === "ollama" ? `${baseUrl}/api/tags` : `${baseUrl}/models`;
         const r = await fetch(url, { headers });

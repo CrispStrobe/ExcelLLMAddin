@@ -9,6 +9,8 @@ import {
   listItems,
   extractFields,
   ask,
+  similarity,
+  cosine,
 } from "../tasks";
 import { LlmSettings, Deps, FetchLike } from "../llm";
 
@@ -90,6 +92,33 @@ describe("sentiment / listItems", () => {
   test("listItems falls back to line-splitting with bullets/numbers", async () => {
     const { deps } = mockFetch("1. alpha\n2. beta\n- gamma");
     expect(await listItems("greek", undefined, settings, deps)).toEqual(["alpha", "beta", "gamma"]);
+  });
+});
+
+describe("similarity / cosine", () => {
+  function embedMock(vectors: number[][]): { deps: Deps } {
+    let i = 0;
+    const fetch: FetchLike = async () => ({
+      ok: true,
+      status: 200,
+      text: async () => JSON.stringify({ data: [{ embedding: vectors[Math.min(i++, vectors.length - 1)] }] }),
+    });
+    return { deps: { fetch } };
+  }
+
+  test("cosine: identical = 1, orthogonal = 0", () => {
+    expect(cosine([1, 2, 3], [1, 2, 3])).toBeCloseTo(1);
+    expect(cosine([1, 0], [0, 1])).toBeCloseTo(0);
+  });
+
+  test("similarity embeds both texts and returns cosine", async () => {
+    const { deps } = embedMock([[1, 0, 0], [1, 0, 0]]);
+    expect(await similarity("cat", "cat", "m", settings, deps)).toBeCloseTo(1);
+  });
+
+  test("similarity requires an embedding model", async () => {
+    const { deps } = embedMock([[1]]);
+    await expect(similarity("a", "b", "", settings, deps)).rejects.toThrow(/embedding model/i);
   });
 });
 

@@ -19,6 +19,7 @@ temp files, and none of the encoding pain of the legacy `.xlam`.
 - `=LLM.LIST(prompt, [count])` — generate a list, spilled down a column
 - `=LLM.FIELDS(text, fields)` — extract fields into a spilled row (text → table)
 - `=LLM.ASK(question, context)` — answer a question using a range as context
+- `=LLM.SIMILARITY(a, b, [model])` — semantic similarity (0..1) via embeddings
 - `=LLM.MAP(range, instruction)` — apply an instruction to every cell, spilling results
 - `=LLM.LIST_MODELS([provider])` — spill available models
 - `=LLM.CONFIG()` — show the active provider/model

@@ -1,7 +1,7 @@
 // Higher-level LLM operations built on runPrompt. Each sets a task-specific
 // system prompt and post-processes the reply. Pure + testable (fetch injected).
 
-import { runPrompt, LlmSettings, Deps } from "./llm";
+import { runPrompt, embed, LlmSettings, Deps } from "./llm";
 
 function withSystem(settings: LlmSettings, system: string): LlmSettings {
   return { ...settings, systemPrompt: system };
@@ -150,6 +150,35 @@ export async function ask(
     "in the context, say so briefly. Output plain text suitable for a cell.";
   const out = await runPrompt(`Context:\n${context}\n\nQuestion: ${question}`, withSystem(settings, system), deps);
   return out.trim();
+}
+
+/** Cosine similarity of two texts' embeddings (1 = identical meaning). */
+export async function similarity(
+  a: string,
+  b: string,
+  model: string,
+  settings: LlmSettings,
+  deps: Deps
+): Promise<number> {
+  const [va, vb] = await Promise.all([
+    embed(a, model, settings, deps),
+    embed(b, model, settings, deps),
+  ]);
+  return cosine(va, vb);
+}
+
+export function cosine(a: number[], b: number[]): number {
+  const n = Math.min(a.length, b.length);
+  let dot = 0;
+  let na = 0;
+  let nb = 0;
+  for (let i = 0; i < n; i++) {
+    dot += a[i] * b[i];
+    na += a[i] * a[i];
+    nb += b[i] * b[i];
+  }
+  if (na === 0 || nb === 0) return 0;
+  return dot / (Math.sqrt(na) * Math.sqrt(nb));
 }
 
 export interface MapOptions {

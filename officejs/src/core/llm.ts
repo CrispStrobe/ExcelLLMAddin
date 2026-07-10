@@ -12,6 +12,7 @@ import {
   getProvider,
   chatEndpoint,
   modelsEndpoint,
+  embeddingsEndpoint,
 } from "./providers";
 
 export class LlmError extends Error {
@@ -31,6 +32,8 @@ export interface LlmSettings {
   /** If set, route through this proxy; keys are held server-side. */
   proxyUrl?: string;
   systemPrompt?: string;
+  /** Embedding model (for SIMILARITY); provider-specific, e.g. Nebius Qwen/Qwen3-Embedding-8B. */
+  embedModel?: string;
 }
 
 export type FetchLike = (
@@ -136,6 +139,62 @@ export async function listModels(
   return extractModelList(spec, text);
 }
 
+/** Get an embedding vector for text. Uses settings.embedModel unless `model` is given. */
+export async function embed(
+  text: string,
+  model: string,
+  settings: LlmSettings,
+  deps: Deps
+): Promise<number[]> {
+  const spec = requireProvider(settings.provider);
+  if (!model) {
+    throw new LlmError("No embedding model set — pass one to SIMILARITY or set it in LLM Settings.");
+  }
+
+  const cacheKey = deps.cache ? JSON.stringify(["embed", settings.provider, model, text]) : "";
+  if (deps.cache) {
+    const hit = deps.cache.get(cacheKey);
+    if (hit !== undefined) return JSON.parse(hit) as number[];
+  }
+
+  let vec: number[];
+  if (settings.proxyUrl) {
+    const data = await callProxy("embed", text, { ...settings, model }, spec, deps);
+    if (!Array.isArray(data.embedding)) throw new LlmError("Proxy returned no embedding.");
+    vec = (data.embedding as unknown[]).map(Number);
+  } else {
+    const baseUrl = settings.baseUrl || spec.defaultBaseUrl;
+    if (spec.requiresKey && !settings.apiKey) {
+      throw new LlmError(`No API key configured for ${spec.label}.`);
+    }
+    const url = embeddingsEndpoint(spec, baseUrl);
+    const body = spec.style === "ollama" ? { model, prompt: text } : { model, input: text };
+    const resp = await deps.fetch(url, {
+      method: "POST",
+      headers: directHeaders(spec, settings.apiKey),
+      body: JSON.stringify(body),
+    });
+    const t = await resp.text();
+    if (!resp.ok) throw new LlmError(parseErrorMessage(t) ?? `HTTP ${resp.status} from ${url}`);
+    vec = extractEmbedding(t);
+  }
+
+  if (deps.cache) deps.cache.set(cacheKey, JSON.stringify(vec));
+  return vec;
+}
+
+function extractEmbedding(text: string): number[] {
+  const data = safeJson(text);
+  if (data && (data as any).error) throw new LlmError(errorMessage((data as any).error));
+  // OpenAI: {data:[{embedding:[...]}]} ; Ollama: {embedding:[...]} or {embeddings:[[...]]}
+  const v =
+    (data as any)?.data?.[0]?.embedding ??
+    (data as any)?.embedding ??
+    (data as any)?.embeddings?.[0];
+  if (!Array.isArray(v)) throw new LlmError("No embedding found in response.");
+  return v.map(Number);
+}
+
 // ---- request building -------------------------------------------------------
 
 export function buildChatBody(
@@ -198,7 +257,7 @@ export function extractModelList(spec: ProviderSpec, text: string): string[] {
 // ---- proxy ------------------------------------------------------------------
 
 async function callProxy(
-  op: "chat" | "models",
+  op: "chat" | "models" | "embed",
   prompt: string,
   settings: LlmSettings,
   spec: ProviderSpec,
