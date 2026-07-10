@@ -6,7 +6,7 @@
 // it to the core's injectable FetchLike so the same tested code path runs here.
 
 import { runPrompt, listModels, LlmSettings } from "../core/llm";
-import { classify, extract, translate, summarize, mapRange } from "../core/tasks";
+import { classify, extract, translate, summarize, mapRange, sentiment, listItems } from "../core/tasks";
 import { loadSettings } from "../core/config";
 import { browserFetch as fetchLike } from "../browserFetch";
 
@@ -160,6 +160,36 @@ function flatten(grid: string[][]): string[] {
   return out;
 }
 
+/**
+ * Classifies the sentiment of text as Positive, Neutral, or Negative.
+ * @customfunction SENTIMENT
+ * @param text The text (or a cell reference).
+ * @returns Positive, Neutral, or Negative.
+ */
+export async function sentimentFn(text: string): Promise<string> {
+  try {
+    return await sentiment(text, await currentSettings(), { fetch: fetchLike });
+  } catch (e) {
+    return errorText(e);
+  }
+}
+
+/**
+ * Generates a list from a prompt and spills it down a column.
+ * @customfunction LIST
+ * @param prompt What to list, e.g. "synonyms of happy".
+ * @param count Optional number of items.
+ * @returns A single-column list.
+ */
+export async function listFn(prompt: string, count?: number): Promise<string[][]> {
+  try {
+    const items = await listItems(prompt, count, await currentSettings(), { fetch: fetchLike });
+    return items.length ? items.map((i) => [i]) : [["(no items)"]];
+  } catch (e) {
+    return [[errorText(e)]];
+  }
+}
+
 CustomFunctions.associate("PROMPT", prompt);
 CustomFunctions.associate("LIST_MODELS", listModelsFn);
 CustomFunctions.associate("CONFIG", config);
@@ -168,3 +198,5 @@ CustomFunctions.associate("EXTRACT", extractFn);
 CustomFunctions.associate("TRANSLATE", translateFn);
 CustomFunctions.associate("SUMMARIZE", summarizeFn);
 CustomFunctions.associate("MAP", mapFn);
+CustomFunctions.associate("SENTIMENT", sentimentFn);
+CustomFunctions.associate("LIST", listFn);

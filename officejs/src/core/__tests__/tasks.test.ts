@@ -1,4 +1,13 @@
-import { classify, extract, translate, summarize, mapRange, matchCategory } from "../tasks";
+import {
+  classify,
+  extract,
+  translate,
+  summarize,
+  mapRange,
+  matchCategory,
+  sentiment,
+  listItems,
+} from "../tasks";
 import { LlmSettings, Deps, FetchLike } from "../llm";
 
 /** Mock fetch that wraps `reply` as an Ollama chat response and records calls. */
@@ -57,6 +66,28 @@ describe("extract / translate / summarize", () => {
     const { deps, calls } = mockFetch("short");
     await summarize("long text", 10, settings, deps);
     expect(JSON.parse(calls[0].init.body).messages[1].content).toContain("10 words");
+  });
+});
+
+describe("sentiment / listItems", () => {
+  test("sentiment returns one of the three labels", async () => {
+    const { deps } = mockFetch("Negative");
+    expect(await sentiment("this is terrible", settings, deps)).toBe("Negative");
+  });
+
+  test("listItems parses a JSON array", async () => {
+    const { deps } = mockFetch(`["red","green","blue"]`);
+    expect(await listItems("primary colors", undefined, settings, deps)).toEqual(["red", "green", "blue"]);
+  });
+
+  test("listItems respects count", async () => {
+    const { deps } = mockFetch(`["a","b","c","d"]`);
+    expect(await listItems("letters", 2, settings, deps)).toEqual(["a", "b"]);
+  });
+
+  test("listItems falls back to line-splitting with bullets/numbers", async () => {
+    const { deps } = mockFetch("1. alpha\n2. beta\n- gamma");
+    expect(await listItems("greek", undefined, settings, deps)).toEqual(["alpha", "beta", "gamma"]);
   });
 });
 

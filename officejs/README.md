@@ -15,6 +15,8 @@ temp files, and none of the encoding pain of the legacy `.xlam`.
 - `=LLM.EXTRACT(text, instruction)` — pull a value out of text
 - `=LLM.TRANSLATE(text, language)` — translate a cell
 - `=LLM.SUMMARIZE(text, [maxWords])` — summarize a cell
+- `=LLM.SENTIMENT(text)` — Positive / Neutral / Negative
+- `=LLM.LIST(prompt, [count])` — generate a list, spilled down a column
 - `=LLM.MAP(range, instruction)` — apply an instruction to every cell, spilling results
 - `=LLM.LIST_MODELS([provider])` — spill available models
 - `=LLM.CONFIG()` — show the active provider/model

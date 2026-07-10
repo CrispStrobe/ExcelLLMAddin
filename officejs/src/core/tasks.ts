@@ -74,6 +74,42 @@ export async function summarize(
   return out.trim();
 }
 
+/** Classify text sentiment into Positive / Neutral / Negative. */
+export async function sentiment(
+  text: string,
+  settings: LlmSettings,
+  deps: Deps
+): Promise<string> {
+  return classify(text, ["Positive", "Neutral", "Negative"], settings, deps);
+}
+
+/**
+ * Ask the model for a list and return it as items. Prefers a JSON array; falls
+ * back to splitting lines and stripping bullet/number prefixes.
+ */
+export async function listItems(
+  prompt: string,
+  count: number | undefined,
+  settings: LlmSettings,
+  deps: Deps
+): Promise<string[]> {
+  const n = count && count > 0 ? Math.floor(count) : undefined;
+  const ask = n ? `${prompt}\n\nReturn exactly ${n} items.` : prompt;
+  const system =
+    "Answer as a JSON array of short strings — no commentary, no code fences.";
+  const raw = await runPrompt(ask, withSystem(settings, system), deps);
+
+  const arr = parseStringArray(raw);
+  const items =
+    arr ??
+    raw
+      .split(/\r?\n/)
+      .map((l) => l.replace(/^\s*(?:[-*•]|\d+[.)])\s*/, "").trim())
+      .filter(Boolean);
+
+  return n ? items.slice(0, n) : items;
+}
+
 export interface MapOptions {
   /** Number of chunks processed concurrently. */
   concurrency?: number;
