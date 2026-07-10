@@ -63,6 +63,24 @@ a workbook anyway. Two supported setups:
   **Proxy URL**. Keys never touch the workbook. See `proxy/worker.js` header for
   deploy steps.
 
+## Agent (edit the sheet in plain English)
+
+The task pane has an **Agent** box. Describe a change and the model operates your
+workbook via tool-calling — `read_range`, `write_range`, `write_formula`,
+`set_format`, `add_worksheet`, `get_selection`, `list_sheets` — looping until done.
+
+- **Approve-before-apply (default):** reads run live so the model sees your data,
+  but writes are queued and shown as **Apply N changes** — you click to apply. A
+  checkbox opts into auto-apply.
+- **MCP (optional):** set an **MCP server URL** in Advanced. The add-in connects
+  over HTTP (JSON-RPC: `initialize` → `tools/list`) and merges that server's tools
+  with the Excel tools. (A sandboxed add-in can't do stdio MCP or host a server,
+  but it can be an HTTP MCP client.)
+
+Examples: *"In D1 put the sum of B2:B10, then bold anything over 100"*,
+*"add a column classifying each row of my selection as high/low"*. Needs a
+tool-calling-capable model (gpt-4o-mini, Claude, Llama-3.3, …).
+
 ## Test it (on any platform, no Excel)
 
 ```bash
@@ -114,11 +132,21 @@ users then get it via **Insert ▸ Get Add-ins ▸ Add**.
 
 ```
 officejs/
-  manifest.xml            # the add-in manifest (this is what you sideload/publish)
-  src/core/               # pure TS: providers, llm client, config  (unit-tested)
+  manifest.xml            # the add-in manifest (shared runtime; sideload/publish this)
+  src/core/               # pure, unit-tested TS: providers, llm, tasks, agent,
+                          #   cache, streamParser, config
   src/core/__tests__/     # Jest tests (no Office/network)
-  src/functions/          # custom functions (=LLM.PROMPT, ...)
-  src/taskpane/           # settings UI
+  src/functions/          # custom functions (=LLM.PROMPT, ... via CustomFunctions)
+  src/taskpane/           # settings UI + Agent panel
+  src/excelTools.ts       # Excel.run tool handlers the agent calls
+  src/mcp.ts              # optional MCP-over-HTTP client
+  src/stream.ts           # streaming driver (=LLM.STREAM)
+  src/harness/            # dev-only: run the task pane in a plain browser
+  src/site/               # landing page + privacy/terms (deployed to Pages)
   proxy/worker.js         # optional serverless key-custody + CORS proxy
-  webpack.config.js       # build (also generates functions.json from JSDoc)
+  tools/                  # icon generator, harness smoke test
+  webpack.config.js       # build (generates functions.json from JSDoc)
 ```
+
+Runs on a **shared runtime** — the task pane and custom functions share one
+long-lived runtime, so opening the pane warms the functions.
