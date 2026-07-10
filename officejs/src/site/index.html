@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Excel LLM Add-in</title>
+    <link rel="icon" href="assets/icon-32.png" />
+    <style>
+      :root {
+        --bg: #ffffff; --fg: #1b1b1b; --muted: #5b5b5b; --line: #e3e3e3;
+        --brand: #178048; --brand2: #0e7c42; --card: #f7f9f8; --code: #eef2f0;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root { --bg:#161817; --fg:#eef0ef; --muted:#a4a9a6; --line:#2c302e;
+                --brand:#2fae63; --brand2:#27a35a; --card:#1e211f; --code:#22262410; }
+        :root { --code:#23272500; }
+      }
+      * { box-sizing: border-box; }
+      body { margin: 0; font-family: -apple-system, "Segoe UI", system-ui, sans-serif;
+             color: var(--fg); background: var(--bg); line-height: 1.55; }
+      .wrap { max-width: 860px; margin: 0 auto; padding: 0 20px; }
+      header { background: linear-gradient(135deg, var(--brand), var(--brand2)); color: #fff; padding: 56px 0 48px; }
+      header .wrap { display: flex; gap: 20px; align-items: center; flex-wrap: wrap; }
+      header img { width: 72px; height: 72px; border-radius: 16px; }
+      h1 { font-size: 34px; margin: 0 0 6px; }
+      .tag { font-size: 17px; opacity: .95; margin: 0; }
+      .btns { margin-top: 20px; display: flex; gap: 12px; flex-wrap: wrap; }
+      a.btn { display: inline-block; padding: 11px 18px; border-radius: 8px; font-weight: 600;
+              text-decoration: none; background: #fff; color: var(--brand2); }
+      a.btn.ghost { background: transparent; color: #fff; border: 1px solid rgba(255,255,255,.6); }
+      section { padding: 40px 0; border-bottom: 1px solid var(--line); }
+      h2 { font-size: 22px; margin: 0 0 14px; }
+      p { color: var(--fg); } .muted { color: var(--muted); }
+      code, .k { background: var(--code); border: 1px solid var(--line); border-radius: 5px;
+                 padding: 1px 6px; font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 13px; }
+      ol { padding-left: 22px; } ol li { margin: 6px 0; }
+      table { width: 100%; border-collapse: collapse; margin-top: 8px; display: block; overflow-x: auto; }
+      th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+      th { color: var(--muted); font-weight: 600; font-size: 13px; }
+      td:first-child { white-space: nowrap; }
+      .grid { display: flex; flex-wrap: wrap; gap: 8px; }
+      .pill { background: var(--card); border: 1px solid var(--line); border-radius: 999px; padding: 5px 12px; font-size: 14px; }
+      footer { padding: 28px 0 48px; color: var(--muted); font-size: 14px; }
+      a { color: var(--brand); }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="wrap">
+        <img src="assets/icon-128.png" alt="" />
+        <div>
+          <h1>Excel LLM Add-in</h1>
+          <p class="tag">Call OpenAI, Mistral, Nebius, OpenRouter, or local Ollama straight from a cell — on Mac, Windows, and the web.</p>
+          <div class="btns">
+            <a class="btn" href="manifest.xml" download>Download manifest</a>
+            <a class="btn ghost" href="https://github.com/CrispStrobe/ExcelLLMAddin">View on GitHub</a>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <div class="wrap">
+      <section>
+        <h2>Install</h2>
+        <p><strong>Mac</strong> — download <code>manifest.xml</code> into Excel's add-in folder, then reopen Excel:</p>
+        <ol>
+          <li><a href="manifest.xml" download>Download the manifest</a> to
+            <code>~/Library/Containers/com.microsoft.Excel/Data/Documents/wef/</code></li>
+          <li>Quit and reopen Excel.</li>
+          <li><b>Insert ▸ Add-ins ▸ My Add-ins</b> → <b>Excel LLM Add-in</b>.</li>
+        </ol>
+        <p><strong>Windows / Web / a whole org</strong> — deploy via the Microsoft 365 admin center
+          (<b>Integrated apps</b>), or publish to AppSource. See
+          <a href="https://github.com/CrispStrobe/ExcelLLMAddin/blob/main/officejs/PUBLISHING.md">PUBLISHING.md</a>.</p>
+        <p class="muted">Then open <b>Home ▸ LLM Settings</b>, pick a provider + model, and go.</p>
+      </section>
+
+      <section>
+        <h2>Functions</h2>
+        <table>
+          <tr><th>Function</th><th>What it does</th></tr>
+          <tr><td class="k">=LLM.PROMPT(text, [provider], [model])</td><td>Send a prompt, get the reply</td></tr>
+          <tr><td class="k">=LLM.CLASSIFY(text, categories)</td><td>Pick one label from a range/list</td></tr>
+          <tr><td class="k">=LLM.EXTRACT(text, instruction)</td><td>Pull a single value out of text</td></tr>
+          <tr><td class="k">=LLM.FIELDS(text, fields)</td><td>Extract many fields into a row (text → table)</td></tr>
+          <tr><td class="k">=LLM.TRANSLATE(text, language)</td><td>Translate a cell</td></tr>
+          <tr><td class="k">=LLM.SUMMARIZE(text, [maxWords])</td><td>Summarize a cell</td></tr>
+          <tr><td class="k">=LLM.SENTIMENT(text)</td><td>Positive / Neutral / Negative</td></tr>
+          <tr><td class="k">=LLM.LIST(prompt, [count])</td><td>Generate a list, spilled down a column</td></tr>
+          <tr><td class="k">=LLM.ASK(question, context)</td><td>Answer a question using a range as context</td></tr>
+          <tr><td class="k">=LLM.MAP(range, instruction)</td><td>Apply an instruction to every cell (batched)</td></tr>
+          <tr><td class="k">=LLM.LIST_MODELS([provider])</td><td>Spill available models</td></tr>
+          <tr><td class="k">=LLM.CONFIG()</td><td>Show the active provider/model</td></tr>
+        </table>
+      </section>
+
+      <section>
+        <h2>Providers</h2>
+        <div class="grid">
+          <span class="pill">OpenAI</span><span class="pill">Mistral</span><span class="pill">Nebius</span>
+          <span class="pill">Scaleway</span><span class="pill">OpenRouter</span><span class="pill">Ollama (local)</span>
+        </div>
+        <p class="muted" style="margin-top:12px">OpenRouter, Nebius, and local Ollama work directly from the browser.
+          For providers that block browser calls, a small serverless proxy keeps your API keys server-side.</p>
+      </section>
+    </div>
+
+    <footer>
+      <div class="wrap">
+        Open source (AGPL-3.0) · <a href="https://github.com/CrispStrobe/ExcelLLMAddin">github.com/CrispStrobe/ExcelLLMAddin</a>
+      </div>
+    </footer>
+  </body>
+</html>
