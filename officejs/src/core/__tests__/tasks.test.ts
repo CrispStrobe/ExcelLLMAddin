@@ -7,6 +7,8 @@ import {
   matchCategory,
   sentiment,
   listItems,
+  extractFields,
+  ask,
 } from "../tasks";
 import { LlmSettings, Deps, FetchLike } from "../llm";
 
@@ -88,6 +90,32 @@ describe("sentiment / listItems", () => {
   test("listItems falls back to line-splitting with bullets/numbers", async () => {
     const { deps } = mockFetch("1. alpha\n2. beta\n- gamma");
     expect(await listItems("greek", undefined, settings, deps)).toEqual(["alpha", "beta", "gamma"]);
+  });
+});
+
+describe("extractFields / ask", () => {
+  test("extractFields returns a value per field from a JSON array", async () => {
+    const { deps } = mockFetch(`["Bob","bob@x.com","30"]`);
+    expect(await extractFields("Bob bob@x.com 30", ["name", "email", "age"], settings, deps)).toEqual([
+      "Bob",
+      "bob@x.com",
+      "30",
+    ]);
+  });
+
+  test("extractFields falls back to per-field when the array doesn't match", async () => {
+    const { deps, calls } = mockFetch("X");
+    const out = await extractFields("t", ["a", "b"], settings, deps);
+    expect(out).toEqual(["X", "X"]);
+    expect(calls.length).toBe(3); // 1 batch attempt + 2 per-field
+  });
+
+  test("ask includes context + question and trims the answer", async () => {
+    const { deps, calls } = mockFetch("  42 \n");
+    expect(await ask("how many apples?", "there are 42 apples", settings, deps)).toBe("42");
+    const body = JSON.parse(calls[0].init.body).messages[1].content;
+    expect(body).toContain("there are 42 apples");
+    expect(body).toContain("how many apples?");
   });
 });
 

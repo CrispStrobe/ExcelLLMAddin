@@ -6,7 +6,17 @@
 // it to the core's injectable FetchLike so the same tested code path runs here.
 
 import { runPrompt, listModels, LlmSettings } from "../core/llm";
-import { classify, extract, translate, summarize, mapRange, sentiment, listItems } from "../core/tasks";
+import {
+  classify,
+  extract,
+  translate,
+  summarize,
+  mapRange,
+  sentiment,
+  listItems,
+  extractFields,
+  ask,
+} from "../core/tasks";
 import { loadSettings } from "../core/config";
 import { browserFetch as fetchLike } from "../browserFetch";
 
@@ -190,6 +200,40 @@ export async function listFn(prompt: string, count?: number): Promise<string[][]
   }
 }
 
+/**
+ * Extracts several fields from text, spilling one value per field across a row.
+ * @customfunction FIELDS
+ * @param text The source text (or a cell reference).
+ * @param fields A range or list of field names/descriptions to extract.
+ * @returns A single row of extracted values, aligned to the fields.
+ */
+export async function fieldsFn(text: string, fields: string[][]): Promise<string[][]> {
+  try {
+    const values = await extractFields(text, flatten(fields), await currentSettings(), { fetch: fetchLike });
+    return [values.length ? values : ["(no fields)"]];
+  } catch (e) {
+    return [[errorText(e)]];
+  }
+}
+
+/**
+ * Answers a question using a range of cells as context.
+ * @customfunction ASK
+ * @param question The question to answer.
+ * @param context A range whose contents are the context.
+ * @returns The answer.
+ */
+export async function askFn(question: string, context: string[][]): Promise<string> {
+  try {
+    const ctx = (context || [])
+      .map((row) => (row || []).map((c) => String(c ?? "")).join("\t"))
+      .join("\n");
+    return await ask(question, ctx, await currentSettings(), { fetch: fetchLike });
+  } catch (e) {
+    return errorText(e);
+  }
+}
+
 CustomFunctions.associate("PROMPT", prompt);
 CustomFunctions.associate("LIST_MODELS", listModelsFn);
 CustomFunctions.associate("CONFIG", config);
@@ -200,3 +244,5 @@ CustomFunctions.associate("SUMMARIZE", summarizeFn);
 CustomFunctions.associate("MAP", mapFn);
 CustomFunctions.associate("SENTIMENT", sentimentFn);
 CustomFunctions.associate("LIST", listFn);
+CustomFunctions.associate("FIELDS", fieldsFn);
+CustomFunctions.associate("ASK", askFn);

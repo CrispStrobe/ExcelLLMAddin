@@ -110,6 +110,48 @@ export async function listItems(
   return n ? items.slice(0, n) : items;
 }
 
+/** Extract several fields from text; returns one value per field, in order. */
+export async function extractFields(
+  text: string,
+  fields: string[],
+  settings: LlmSettings,
+  deps: Deps
+): Promise<string[]> {
+  const fs = fields.map((f) => String(f).trim()).filter(Boolean);
+  if (fs.length === 0) return [];
+
+  const system =
+    "Extract the requested fields from the text. Return ONLY a JSON array of " +
+    "string values, one per field, in the given order. Use an empty string for " +
+    "any field not present. No commentary or code fences.";
+  const numbered = fs.map((f, i) => `${i + 1}. ${f}`).join("\n");
+  const user = `Fields:\n${numbered}\n\nText:\n${text}\n\nReturn a JSON array of exactly ${fs.length} strings.`;
+
+  try {
+    const raw = await runPrompt(user, withSystem(settings, system), deps);
+    const arr = parseStringArray(raw);
+    if (arr && arr.length === fs.length) return arr.map((v) => v.trim());
+  } catch {
+    /* fall through to per-field */
+  }
+
+  return Promise.all(fs.map((f) => extract(text, f, settings, deps).catch((e) => "Error: " + errMsg(e))));
+}
+
+/** Answer a question using only the supplied context text. */
+export async function ask(
+  question: string,
+  context: string,
+  settings: LlmSettings,
+  deps: Deps
+): Promise<string> {
+  const system =
+    "Answer the question using only the provided context. If the answer is not " +
+    "in the context, say so briefly. Output plain text suitable for a cell.";
+  const out = await runPrompt(`Context:\n${context}\n\nQuestion: ${question}`, withSystem(settings, system), deps);
+  return out.trim();
+}
+
 export interface MapOptions {
   /** Number of chunks processed concurrently. */
   concurrency?: number;
