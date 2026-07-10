@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>LLM Settings — Dev Harness</title>
+    <!-- No office.js here: OfficeRuntime/Office are mocked (see officeMock.ts) so
+         the task pane runs in a normal browser. Provider calls are REAL fetches,
+         so CORS-friendly providers (OpenRouter, Nebius, Ollama) work end to end. -->
+  </head>
+  <body>
+    <div style="background:#7a4; color:#fff; padding:6px 12px; font:600 12px system-ui;">
+      DEV HARNESS — Office is mocked, storage is localStorage. Not Excel.
+    </div>
+    <!-- Mirrors taskpane.html's form (kept in sync manually; it's a dev tool). -->
+    <main class="pane">
+      <h1>LLM Add-in</h1>
+      <p class="hint">Configure a provider, then use <code>=LLM.PROMPT("…")</code> in any cell.</p>
+
+      <label for="provider">Provider</label>
+      <select id="provider"></select>
+
+      <label for="model">Model
+        <button id="refreshModels" type="button" class="link">load list</button>
+      </label>
+      <input id="model" placeholder="e.g. openai/gpt-4o-mini" autocomplete="off" />
+      <input id="modelFilter" class="hidden" placeholder="filter models…" autocomplete="off" />
+      <select id="modelSelect" class="hidden" size="6"></select>
+
+      <label for="apiKey">API key <span class="muted">(not needed for Ollama or when using a proxy)</span></label>
+      <input id="apiKey" type="password" placeholder="sk-…" autocomplete="off" />
+
+      <details>
+        <summary>Advanced</summary>
+        <label for="baseUrl">Base URL override</label>
+        <input id="baseUrl" placeholder="(provider default)" />
+
+        <label for="proxyUrl">Proxy URL <span class="muted">(recommended for cloud providers — keeps keys server-side)</span></label>
+        <input id="proxyUrl" placeholder="https://your-proxy.example/api" />
+
+        <label for="systemPrompt">System prompt override</label>
+        <textarea id="systemPrompt" rows="2" placeholder="(default)"></textarea>
+      </details>
+
+      <div class="row">
+        <button id="save" type="button" class="primary">Save</button>
+        <button id="test" type="button">Test</button>
+        <button id="reload" type="button" title="Reload">Reload</button>
+      </div>
+
+      <p id="status" class="status" role="status"></p>
+    </main>
+  </body>
+</html>

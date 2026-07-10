@@ -15,7 +15,8 @@
     "start": "office-addin-debugging start manifest.xml",
     "stop": "office-addin-debugging stop manifest.xml",
     "validate": "office-addin-manifest validate manifest.xml",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "harness:smoke": "node tools/drive-harness.cjs"
   },
   "dependencies": {
     "core-js": "^3.36.0"
@@ -34,6 +35,7 @@
     "office-addin-debugging": "^5.1.5",
     "office-addin-dev-certs": "^1.13.0",
     "office-addin-manifest": "^1.13.0",
+    "playwright-core": "^1.61.1",
     "style-loader": "^3.3.4",
     "ts-jest": "^29.1.2",
     "ts-loader": "^9.5.1",

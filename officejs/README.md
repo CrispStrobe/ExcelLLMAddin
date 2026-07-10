@@ -67,6 +67,30 @@ The core (`src/core/*`) is Office-free and tested with a mocked `fetch`, so the
 request-build → parse → error pipeline is verified deterministically — this is
 the cross-platform CI gate.
 
+## Dev harness (iterate on the task pane without Excel)
+
+The task pane also runs in a normal browser with Office mocked — far faster than
+the Excel reload loop. With the dev server running (`npm start` or `npm run
+dev-server`), open:
+
+```
+https://localhost:3000/harness.html
+```
+
+Provider calls are **real** fetches, so CORS-friendly providers (OpenRouter,
+Nebius, local Ollama) work end to end right in the browser — you can Save, Test,
+and load models without Excel. (The harness is dev-only; it is never built into
+`dist/` or shipped.)
+
+Headless smoke test (drives the harness in Chrome, runs a real OpenRouter call):
+
+```bash
+OPENROUTER_API_KEY=sk-or-... npm run harness:smoke
+```
+
+Excel-only behaviour (custom-function registration, `=LLM.PROMPT` in a cell) still
+has to be checked in Excel — but everything else iterates here in seconds.
+
 ## Build for production
 
 ```bash

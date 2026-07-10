@@ -25,6 +25,8 @@ module.exports = async (env, options) => {
     entry: {
       taskpane: "./src/taskpane/taskpane.ts",
       functions: "./src/functions/functions.ts",
+      // Dev-only browser harness: runs the task pane with Office mocked.
+      ...(dev ? { harness: "./src/harness/harness.ts" } : {}),
     },
     output: {
       clean: true,
@@ -74,6 +76,15 @@ module.exports = async (env, options) => {
         template: "./src/functions/functions.html",
         chunks: ["functions"],
       }),
+      ...(dev
+        ? [
+            new HtmlWebpackPlugin({
+              filename: "harness.html",
+              template: "./src/harness/harness.html",
+              chunks: ["harness"],
+            }),
+          ]
+        : []),
       new CopyWebpackPlugin({
         patterns: [
           { from: "assets", to: "assets", noErrorOnMissing: true },
