@@ -1,0 +1,115 @@
+import "./taskpane.css";
+import { PROVIDERS, getProvider } from "../core/providers";
+import { loadSettings, saveSettings } from "../core/config";
+import { runPrompt, listModels, LlmSettings, FetchLike } from "../core/llm";
+
+/* global Office, fetch, document */
+
+const fetchLike: FetchLike = (url, init) =>
+  fetch(url, init as RequestInit).then((r) => ({
+    ok: r.ok,
+    status: r.status,
+    text: () => r.text(),
+  }));
+
+Office.onReady((info) => {
+  if (info.host === Office.HostType.Excel) {
+    void init();
+  }
+});
+
+async function init(): Promise<void> {
+  populateProviders();
+  setForm(await loadSettings());
+  byId<HTMLButtonElement>("save").onclick = onSave;
+  byId<HTMLButtonElement>("test").onclick = onTest;
+  byId<HTMLButtonElement>("refreshModels").onclick = onRefreshModels;
+  byId<HTMLSelectElement>("provider").onchange = updateKeyHint;
+  updateKeyHint();
+}
+
+function populateProviders(): void {
+  const sel = byId<HTMLSelectElement>("provider");
+  sel.innerHTML = "";
+  for (const spec of Object.values(PROVIDERS)) {
+    const opt = document.createElement("option");
+    opt.value = spec.id;
+    opt.textContent = spec.label;
+    sel.appendChild(opt);
+  }
+}
+
+function setForm(s: LlmSettings): void {
+  byId<HTMLSelectElement>("provider").value = s.provider;
+  byId<HTMLInputElement>("model").value = s.model || "";
+  byId<HTMLInputElement>("apiKey").value = s.apiKey || "";
+  byId<HTMLInputElement>("baseUrl").value = s.baseUrl || "";
+  byId<HTMLInputElement>("proxyUrl").value = s.proxyUrl || "";
+  byId<HTMLTextAreaElement>("systemPrompt").value = s.systemPrompt || "";
+}
+
+function readForm(): LlmSettings {
+  return {
+    provider: byId<HTMLSelectElement>("provider").value,
+    model: byId<HTMLInputElement>("model").value.trim(),
+    apiKey: byId<HTMLInputElement>("apiKey").value.trim(),
+    baseUrl: byId<HTMLInputElement>("baseUrl").value.trim(),
+    proxyUrl: byId<HTMLInputElement>("proxyUrl").value.trim(),
+    systemPrompt: byId<HTMLTextAreaElement>("systemPrompt").value.trim(),
+  };
+}
+
+async function onSave(): Promise<void> {
+  await saveSettings(readForm());
+  setStatus("Saved.", "ok");
+}
+
+async function onTest(): Promise<void> {
+  setStatus("Testing…", "");
+  try {
+    const reply = await runPrompt("Reply with exactly: Hello from Excel", readForm(), { fetch: fetchLike });
+    setStatus("OK: " + reply, "ok");
+  } catch (e) {
+    setStatus(errText(e), "err");
+  }
+}
+
+async function onRefreshModels(): Promise<void> {
+  setStatus("Loading models…", "");
+  try {
+    const models = await listModels(readForm(), { fetch: fetchLike });
+    const dl = byId<HTMLDataListElement>("modelList");
+    dl.innerHTML = "";
+    for (const m of models) {
+      const opt = document.createElement("option");
+      opt.value = m;
+      dl.appendChild(opt);
+    }
+    setStatus(`${models.length} model(s) loaded — click the model box.`, "ok");
+  } catch (e) {
+    setStatus(errText(e), "err");
+  }
+}
+
+function updateKeyHint(): void {
+  const spec = getProvider(byId<HTMLSelectElement>("provider").value);
+  const key = byId<HTMLInputElement>("apiKey");
+  key.disabled = !!spec && !spec.requiresKey;
+  key.placeholder = spec && !spec.requiresKey ? "(no key needed)" : "sk-…";
+}
+
+function errText(e: unknown): string {
+  return e instanceof Error ? e.message : String(e);
+}
+
+function setStatus(msg: string, kind: "ok" | "err" | ""): void {
+  const el = byId<HTMLParagraphElement>("status");
+  el.textContent = msg;
+  el.className = "status " + kind;
+}
+
+function byId<T extends HTMLElement>(id: string): T {
+  const el = document.getElementById(id);
+  if (!el) throw new Error(`Missing element #${id}`);
+  return el as T;
+}

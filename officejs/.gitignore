@@ -1,0 +1,6 @@
+node_modules/
+dist/
+*.log
+.DS_Store
+# dev certs / office-addin state
+.office-addin-debugging/

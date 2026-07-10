@@ -6,6 +6,26 @@ on:
   pull_request:
 
 jobs:
+  officejs:
+    name: Office.js build + tests (all platforms, no Excel)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: officejs
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install
+        run: npm install --no-audit --no-fund
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Unit + functional tests
+        run: npm test
+      - name: Production build
+        run: npm run build
+
   vba-tests:
     name: VBA unit + functional tests (Windows/Excel)
     # Requires a Windows runner with Desktop Excel installed. GitHub-hosted
