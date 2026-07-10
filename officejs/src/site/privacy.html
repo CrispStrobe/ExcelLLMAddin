@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Privacy Policy — Excel LLM Add-in</title>
+    <style>
+      body { font-family: -apple-system, "Segoe UI", system-ui, sans-serif; line-height: 1.6;
+             max-width: 760px; margin: 0 auto; padding: 40px 20px; color: #1b1b1b; }
+      @media (prefers-color-scheme: dark) { body { background:#161817; color:#eef0ef; } a{color:#2fae63;} }
+      h1 { font-size: 26px; } h2 { font-size: 19px; margin-top: 28px; }
+      code { background: rgba(127,127,127,.15); padding: 1px 5px; border-radius: 4px; }
+      .muted { color: #777; font-size: 14px; }
+    </style>
+  </head>
+  <body>
+    <h1>Privacy Policy</h1>
+    <p class="muted">Excel LLM Add-in. Last updated: 2026.</p>
+
+    <p>The Excel LLM Add-in runs entirely on your device inside Excel. It has no backend
+      server of its own — the add-in files are served as static content, and it does
+      <strong>not</strong> collect, store, or transmit your data to us.</p>
+
+    <h2>What the add-in sends, and to whom</h2>
+    <p>When you use a function such as <code>=LLM.PROMPT(...)</code>, the text you provide is
+      sent <em>directly from your device</em> to the LLM provider you configure (e.g. OpenAI,
+      Mistral, Nebius, Scaleway, OpenRouter, or a local Ollama server), or to the proxy URL
+      you configure. That provider's own privacy policy governs how they handle it. We are not
+      an intermediary and never receive your prompts or responses.</p>
+
+    <h2>Where your settings and keys are stored</h2>
+    <p>Your provider, model, and any API keys you enter are stored locally on your device via
+      Office's per-user add-in storage (<code>OfficeRuntime.storage</code>). They are not sent
+      anywhere except, as an <code>Authorization</code> header, to the provider or proxy you
+      chose when you invoke a function. For cloud providers, using the optional proxy keeps
+      keys on your own server instead of in the workbook.</p>
+
+    <h2>No tracking</h2>
+    <p>The add-in contains no analytics, advertising, or third-party trackers.</p>
+
+    <h2>Contact</h2>
+    <p>Questions or issues: <a href="https://github.com/CrispStrobe/ExcelLLMAddin">github.com/CrispStrobe/ExcelLLMAddin</a>.</p>
+  </body>
+</html>

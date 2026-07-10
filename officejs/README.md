@@ -24,6 +24,7 @@ temp files, and none of the encoding pain of the legacy `.xlam`.
 - `=LLM.MAP(range, instruction)` — apply an instruction to every cell, spilling results
 - `=LLM.LIST_MODELS([provider])` — spill available models
 - `=LLM.CONFIG()` — show the active provider/model
+- **Agent** — describe an edit in plain English; the model reads/writes ranges, formulas, and formatting on your sheet via tool-calling (extensible with remote MCP servers)
 - A task pane (Home ▸ **LLM Settings**) to pick provider, model, key, or proxy
 - Providers: OpenAI, Mistral, Nebius, Scaleway, OpenRouter, Ollama (local)
 

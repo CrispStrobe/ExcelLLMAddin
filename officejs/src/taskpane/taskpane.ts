@@ -2,6 +2,8 @@ import "./taskpane.css";
 import { PROVIDERS, getProvider } from "../core/providers";
 import { loadSettings, saveSettings } from "../core/config";
 import { runPrompt, listModels, LlmSettings } from "../core/llm";
+import { runAgent } from "../core/agent";
+import { EXCEL_TOOLS, executeExcelTool } from "../excelTools";
 import { browserFetch as fetchLike } from "../browserFetch";
 
 /* global Office, document, window */
@@ -25,7 +27,30 @@ async function init(): Promise<void> {
     renderModels(byId<HTMLInputElement>("modelFilter").value);
   byId<HTMLSelectElement>("modelSelect").onchange = onPickModel;
   byId<HTMLButtonElement>("reload").onclick = () => window.location.reload();
+  byId<HTMLButtonElement>("agentRun").onclick = onAgentRun;
   updateKeyHint();
+}
+
+async function onAgentRun(): Promise<void> {
+  const input = byId<HTMLTextAreaElement>("agentInput").value.trim();
+  const log = byId<HTMLDivElement>("agentLog");
+  if (!input) {
+    log.textContent = "Type an instruction first.";
+    return;
+  }
+  log.textContent = "Working…";
+  try {
+    const res = await runAgent(input, EXCEL_TOOLS, readForm(), { fetch: fetchLike }, executeExcelTool);
+    const lines = res.steps.map((s) => `• ${s.tool}(${clip(JSON.stringify(s.args))}) → ${clip(s.result)}`);
+    lines.push("", res.finalText || "(done)");
+    log.textContent = lines.join("\n");
+  } catch (e) {
+    log.textContent = errText(e);
+  }
+}
+
+function clip(s: string): string {
+  return s.length > 90 ? s.slice(0, 90) + "…" : s;
 }
 
 function populateProviders(): void {

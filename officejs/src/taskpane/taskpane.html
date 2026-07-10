@@ -47,6 +47,12 @@
       </div>
 
       <p id="status" class="status" role="status"></p>
+
+      <hr class="sep" />
+      <h2 class="agent-h">Agent <span class="muted">— lets the model edit your sheet</span></h2>
+      <textarea id="agentInput" rows="2" placeholder="e.g. In D1 put the sum of B2:B10, then bold any cell over 100"></textarea>
+      <button id="agentRun" type="button" class="primary">Run agent</button>
+      <div id="agentLog" class="agentlog" role="status"></div>
     </main>
   </body>
 </html>
