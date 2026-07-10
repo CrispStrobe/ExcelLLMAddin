@@ -88,7 +88,11 @@ module.exports = async (env, options) => {
         ? { type: "https", options: { key: httpsOptions.key, cert: httpsOptions.cert, ca: httpsOptions.ca } }
         : "https",
       port: 3000,
-      static: [path.join(__dirname, "dist")],
+      // Do NOT serve dist/ statically: webpack-dev-server already serves every
+      // emitted asset (taskpane.html, functions.js, functions.json, icons) from
+      // memory. Pointing static at the build output collides with those in-memory
+      // assets ("Multiple assets emit ... functions.json") and corrupts the build.
+      static: false,
     },
   };
   return config;
