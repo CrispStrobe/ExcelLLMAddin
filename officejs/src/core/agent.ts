@@ -134,6 +134,31 @@ export async function runAgent(
   return { finalText: "Stopped: reached the step limit before finishing.", steps };
 }
 
+export interface PendingAction {
+  name: string;
+  args: any;
+}
+
+/**
+ * Wrap a real executor so that mutating ("write") tools are queued for approval
+ * instead of run. Read tools pass through (the model still sees real data). The
+ * returned `pending` array collects the deferred actions to apply later.
+ */
+export function createApprovalExecutor(
+  real: ToolExecutor,
+  isWriteTool: (name: string) => boolean
+): { executor: ToolExecutor; pending: PendingAction[] } {
+  const pending: PendingAction[] = [];
+  const executor: ToolExecutor = async (name, args) => {
+    if (isWriteTool(name)) {
+      pending.push({ name, args });
+      return `Queued ${name} for approval (not applied yet).`;
+    }
+    return real(name, args);
+  };
+  return { executor, pending };
+}
+
 function safeJson(text: string): unknown {
   try {
     return JSON.parse(text);

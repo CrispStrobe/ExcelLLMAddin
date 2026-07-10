@@ -1,4 +1,4 @@
-import { runAgent, chatWithTools, ToolSchema } from "../agent";
+import { runAgent, chatWithTools, createApprovalExecutor, ToolSchema } from "../agent";
 import { LlmSettings, Deps, FetchLike } from "../llm";
 
 /** Fetch double that returns queued response bodies in order. */
@@ -90,6 +90,30 @@ describe("runAgent", () => {
     const res = await runAgent("loop", TOOLS, settings, deps, async () => "ok", { maxSteps: 3 });
     expect(res.steps).toHaveLength(3);
     expect(res.finalText).toMatch(/step limit/i);
+  });
+});
+
+describe("createApprovalExecutor", () => {
+  test("queues writes and passes reads through", async () => {
+    const real = jest.fn(async (name: string) => `real:${name}`);
+    const { executor, pending } = createApprovalExecutor(real, (n) => n.startsWith("write"));
+    expect(await executor("read_range", { a: 1 })).toBe("real:read_range");
+    expect(await executor("write_range", { address: "A1" })).toMatch(/Queued/);
+    expect(pending).toEqual([{ name: "write_range", args: { address: "A1" } }]);
+    expect(real).toHaveBeenCalledTimes(1);
+  });
+
+  test("runAgent in approval mode defers the write", async () => {
+    const { deps } = queueMock([
+      toolCallResponse("write_range", { address: "A1", values: [[1]] }),
+      finalResponse("Planned the write."),
+    ]);
+    const real = jest.fn(async () => "applied");
+    const { executor, pending } = createApprovalExecutor(real, (n) => n === "write_range");
+    const res = await runAgent("write 1", TOOLS, settings, deps, executor);
+    expect(pending).toHaveLength(1);
+    expect(real).not.toHaveBeenCalled();
+    expect(res.finalText).toContain("Planned");
   });
 });
 

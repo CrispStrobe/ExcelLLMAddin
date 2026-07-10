@@ -97,6 +97,10 @@ code { background: rgba(127,127,127,0.15); padding: 1px 4px; border-radius: 3px;
 .agent-h { font-size: 15px; margin: 0 0 8px; }
 #agentInput { margin-bottom: 8px; }
 #agentRun { margin-bottom: 10px; }
+.agentopt { display: flex; align-items: center; gap: 6px; font-weight: normal;
+  font-size: 13px; color: var(--muted); margin: 0 0 10px; }
+.agentopt input { width: auto; }
+.agent-apply { margin-top: 10px; }
 .agentlog {
   white-space: pre-wrap; word-break: break-word; font-size: 13px;
   font-family: ui-monospace, "SF Mono", Menlo, monospace;

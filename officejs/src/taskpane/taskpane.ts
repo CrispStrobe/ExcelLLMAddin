@@ -2,8 +2,8 @@ import "./taskpane.css";
 import { PROVIDERS, getProvider } from "../core/providers";
 import { loadSettings, saveSettings } from "../core/config";
 import { runPrompt, listModels, LlmSettings } from "../core/llm";
-import { runAgent } from "../core/agent";
-import { EXCEL_TOOLS, executeExcelTool } from "../excelTools";
+import { runAgent, createApprovalExecutor, PendingAction, ToolExecutor } from "../core/agent";
+import { EXCEL_TOOLS, executeExcelTool, WRITE_TOOLS } from "../excelTools";
 import { browserFetch as fetchLike } from "../browserFetch";
 
 /* global Office, document, window */
@@ -28,25 +28,63 @@ async function init(): Promise<void> {
   byId<HTMLSelectElement>("modelSelect").onchange = onPickModel;
   byId<HTMLButtonElement>("reload").onclick = () => window.location.reload();
   byId<HTMLButtonElement>("agentRun").onclick = onAgentRun;
+  byId<HTMLButtonElement>("agentApply").onclick = onAgentApply;
   updateKeyHint();
 }
+
+let pending: PendingAction[] = [];
 
 async function onAgentRun(): Promise<void> {
   const input = byId<HTMLTextAreaElement>("agentInput").value.trim();
   const log = byId<HTMLDivElement>("agentLog");
+  const applyBtn = byId<HTMLButtonElement>("agentApply");
   if (!input) {
     log.textContent = "Type an instruction first.";
     return;
   }
+  const auto = byId<HTMLInputElement>("agentAuto").checked;
+  pending = [];
+  applyBtn.style.display = "none";
   log.textContent = "Working…";
   try {
-    const res = await runAgent(input, EXCEL_TOOLS, readForm(), { fetch: fetchLike }, executeExcelTool);
+    let executor: ToolExecutor = executeExcelTool;
+    let queued: PendingAction[] = [];
+    if (!auto) {
+      const wrapped = createApprovalExecutor(executeExcelTool, (n) => WRITE_TOOLS.has(n));
+      executor = wrapped.executor;
+      queued = wrapped.pending;
+    }
+    const res = await runAgent(input, EXCEL_TOOLS, readForm(), { fetch: fetchLike }, executor);
     const lines = res.steps.map((s) => `• ${s.tool}(${clip(JSON.stringify(s.args))}) → ${clip(s.result)}`);
     lines.push("", res.finalText || "(done)");
     log.textContent = lines.join("\n");
+    if (!auto && queued.length) {
+      pending = queued;
+      applyBtn.textContent = `Apply ${pending.length} change${pending.length > 1 ? "s" : ""}`;
+      applyBtn.style.display = "";
+    }
   } catch (e) {
     log.textContent = errText(e);
   }
+}
+
+async function onAgentApply(): Promise<void> {
+  const log = byId<HTMLDivElement>("agentLog");
+  const applyBtn = byId<HTMLButtonElement>("agentApply");
+  applyBtn.disabled = true;
+  log.textContent += "\n\nApplying…";
+  for (const a of pending) {
+    let r: string;
+    try {
+      r = await executeExcelTool(a.name, a.args);
+    } catch (e) {
+      r = errText(e);
+    }
+    log.textContent += `\n• ${a.name} → ${clip(r)}`;
+  }
+  pending = [];
+  applyBtn.style.display = "none";
+  applyBtn.disabled = false;
 }
 
 function clip(s: string): string {

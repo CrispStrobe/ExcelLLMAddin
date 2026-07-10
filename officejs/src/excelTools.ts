@@ -75,6 +75,9 @@ export const EXCEL_TOOLS: ToolSchema[] = [
   },
 ];
 
+/** Tools that change the workbook (vs. read-only). Used for approve-before-apply. */
+export const WRITE_TOOLS = new Set(["write_range", "write_formula", "set_format", "add_worksheet"]);
+
 export async function executeExcelTool(name: string, args: any): Promise<string> {
   switch (name) {
     case "read_range":
