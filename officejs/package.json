@@ -32,6 +32,7 @@
     "html-loader": "^5.0.0",
     "html-webpack-plugin": "^5.6.0",
     "jest": "^29.7.0",
+    "mini-css-extract-plugin": "^2.10.2",
     "office-addin-debugging": "^5.1.5",
     "office-addin-dev-certs": "^1.13.0",
     "office-addin-manifest": "^1.13.0",

@@ -9,17 +9,14 @@ import { browserFetch as fetchLike } from "../browserFetch";
 
 /* global Office, document, window */
 
-Office.onReady((info) => {
-  if (info.host === Office.HostType.Excel) {
-    void init();
-  }
-});
-
 let allModels: string[] = [];
 
-async function init(): Promise<void> {
+// Make the pane usable immediately — the script is deferred, so the DOM is ready
+// here. We do NOT wait for Office.onReady to populate the dropdown or wire the
+// buttons (that wait is what left the pane empty/unusable while the host warmed
+// up). Only reading saved settings needs the Office host.
+function initUi(): void {
   populateProviders();
-  setForm(await loadSettings());
   byId<HTMLButtonElement>("save").onclick = onSave;
   byId<HTMLButtonElement>("test").onclick = onTest;
   byId<HTMLButtonElement>("refreshModels").onclick = onRefreshModels;
@@ -32,6 +29,23 @@ async function init(): Promise<void> {
   byId<HTMLButtonElement>("agentApply").onclick = onAgentApply;
   updateKeyHint();
 }
+
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", initUi);
+} else {
+  initUi();
+}
+
+// Fill in the user's saved settings once the Office host (storage) is ready.
+Office.onReady((info) => {
+  if (info.host === Office.HostType.Excel) {
+    loadSettings()
+      .then(setForm)
+      .catch(() => {
+        /* keep defaults on failure */
+      });
+  }
+});
 
 let pending: PendingAction[] = [];
 

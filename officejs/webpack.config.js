@@ -2,6 +2,7 @@ const path = require("path");
 const HtmlWebpackPlugin = require("html-webpack-plugin");
 const CopyWebpackPlugin = require("copy-webpack-plugin");
 const CustomFunctionsMetadataPlugin = require("custom-functions-metadata-plugin");
+const MiniCssExtractPlugin = require("mini-css-extract-plugin");
 const devCerts = require("office-addin-dev-certs");
 
 // Where the built add-in is served from. Dev uses the local https dev-server;
@@ -53,7 +54,7 @@ module.exports = async (env, options) => {
           },
         },
         { test: /\.html$/, use: "html-loader" },
-        { test: /\.css$/, use: ["style-loader", "css-loader"] },
+        { test: /\.css$/, use: [MiniCssExtractPlugin.loader, "css-loader"] },
         {
           test: /\.(png|jpg|jpeg|gif|ico)$/,
           type: "asset/resource",
@@ -62,6 +63,7 @@ module.exports = async (env, options) => {
       ],
     },
     plugins: [
+      new MiniCssExtractPlugin(),
       new CustomFunctionsMetadataPlugin({
         output: "functions.json",
         input: path.resolve(__dirname, "src/functions/functions.ts"),
