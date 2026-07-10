@@ -5,18 +5,12 @@
 // Runtime note: the custom-functions runtime provides a global `fetch`; we adapt
 // it to the core's injectable FetchLike so the same tested code path runs here.
 
-import { runPrompt, listModels, LlmSettings, FetchLike } from "../core/llm";
+import { runPrompt, listModels, LlmSettings } from "../core/llm";
 import { classify, extract, translate, summarize, mapRange } from "../core/tasks";
 import { loadSettings } from "../core/config";
+import { browserFetch as fetchLike } from "../browserFetch";
 
-/* global CustomFunctions, fetch */
-
-const fetchLike: FetchLike = (url, init) =>
-  fetch(url, init as RequestInit).then((r) => ({
-    ok: r.ok,
-    status: r.status,
-    text: () => r.text(),
-  }));
+/* global CustomFunctions */
 
 async function currentSettings(provider?: string, model?: string): Promise<LlmSettings> {
   const s = await loadSettings();

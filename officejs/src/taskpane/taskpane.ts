@@ -1,16 +1,10 @@
 import "./taskpane.css";
 import { PROVIDERS, getProvider } from "../core/providers";
 import { loadSettings, saveSettings } from "../core/config";
-import { runPrompt, listModels, LlmSettings, FetchLike } from "../core/llm";
+import { runPrompt, listModels, LlmSettings } from "../core/llm";
+import { browserFetch as fetchLike } from "../browserFetch";
 
-/* global Office, fetch, document */
-
-const fetchLike: FetchLike = (url, init) =>
-  fetch(url, init as RequestInit).then((r) => ({
-    ok: r.ok,
-    status: r.status,
-    text: () => r.text(),
-  }));
+/* global Office, document, window */
 
 Office.onReady((info) => {
   if (info.host === Office.HostType.Excel) {
@@ -30,6 +24,7 @@ async function init(): Promise<void> {
   byId<HTMLInputElement>("modelFilter").oninput = () =>
     renderModels(byId<HTMLInputElement>("modelFilter").value);
   byId<HTMLSelectElement>("modelSelect").onchange = onPickModel;
+  byId<HTMLButtonElement>("reload").onclick = () => window.location.reload();
   updateKeyHint();
 }
 
