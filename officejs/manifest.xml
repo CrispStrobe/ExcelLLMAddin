@@ -14,7 +14,7 @@
   <Description DefaultValue="Call LLM providers (OpenAI, Mistral, Ollama, OpenRouter, ...) directly from Excel cells with =LLM.PROMPT()."/>
   <IconUrl DefaultValue="https://localhost:3000/assets/icon-32.png"/>
   <HighResolutionIconUrl DefaultValue="https://localhost:3000/assets/icon-64.png"/>
-  <SupportUrl DefaultValue="https://github.com/CrispStrobe/ExcelLLM"/>
+  <SupportUrl DefaultValue="https://github.com/CrispStrobe/ExcelLLMAddin"/>
 
   <AppDomains>
     <AppDomain>https://localhost:3000</AppDomain>
@@ -104,7 +104,7 @@
         <bt:Url id="Functions.Page.Url" DefaultValue="https://localhost:3000/functions.html"/>
         <bt:Url id="Functions.Metadata.Url" DefaultValue="https://localhost:3000/functions.json"/>
         <bt:Url id="Taskpane.Url" DefaultValue="https://localhost:3000/taskpane.html"/>
-        <bt:Url id="GetStarted.LearnMore" DefaultValue="https://github.com/CrispStrobe/ExcelLLM"/>
+        <bt:Url id="GetStarted.LearnMore" DefaultValue="https://github.com/CrispStrobe/ExcelLLMAddin"/>
       </bt:Urls>
       <bt:ShortStrings>
         <bt:String id="Functions.Namespace" DefaultValue="LLM"/>

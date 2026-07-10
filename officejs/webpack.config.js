@@ -2,15 +2,24 @@ const path = require("path");
 const HtmlWebpackPlugin = require("html-webpack-plugin");
 const CopyWebpackPlugin = require("copy-webpack-plugin");
 const CustomFunctionsMetadataPlugin = require("custom-functions-metadata-plugin");
+const devCerts = require("office-addin-dev-certs");
 
 // Where the built add-in is served from. Dev uses the local https dev-server;
 // override urlProd with your hosting origin (GitHub Pages, Azure Static Web
 // Apps, etc.) before running a production build + publishing the manifest.
-const urlDev = "https://localhost:3000/";
-const urlProd = "https://localhost:3000/";
+// Production hosting origin. GitHub Pages project site for CrispStrobe/ExcelLLMAddin.
+// Change these if you host elsewhere (Azure Static Web Apps, Cloudflare Pages, a
+// custom domain, ...).
+const prodOrigin = "https://crispstrobe.github.io";
+const urlProd = `${prodOrigin}/ExcelLLMAddin/`;
 
 module.exports = async (env, options) => {
   const dev = options.mode === "development";
+  // Serve the SAME cert that `office-addin-dev-certs install` trusted in the
+  // system keychain. Without this, webpack-dev-server self-signs a different,
+  // untrusted cert and Excel's WKWebView blocks the add-in ("not signed by a
+  // valid security certificate").
+  const httpsOptions = dev ? await devCerts.getHttpsServerOptions() : undefined;
   const config = {
     devtool: "source-map",
     entry: {
@@ -20,6 +29,9 @@ module.exports = async (env, options) => {
     output: {
       clean: true,
       path: path.resolve(__dirname, "dist"),
+      // Relative so injected asset URLs resolve correctly under a Pages subpath
+      // (https://…/ExcelLLMAddin/taskpane.html -> ./taskpane.js).
+      publicPath: "",
     },
     resolve: {
       extensions: [".ts", ".js"],
@@ -59,7 +71,12 @@ module.exports = async (env, options) => {
             to: "[name][ext]",
             transform(content) {
               if (dev) return content;
-              return content.toString().replace(new RegExp(urlDev, "g"), urlProd);
+              // Resource URLs (with trailing slash) -> prod subpath; then the
+              // bare AppDomain origin -> prod origin.
+              return content
+                .toString()
+                .replace(/https:\/\/localhost:3000\//g, urlProd)
+                .replace(/https:\/\/localhost:3000/g, prodOrigin);
             },
           },
         ],
@@ -67,7 +84,9 @@ module.exports = async (env, options) => {
     ],
     devServer: {
       headers: { "Access-Control-Allow-Origin": "*" },
-      server: "https",
+      server: httpsOptions
+        ? { type: "https", options: { key: httpsOptions.key, cert: httpsOptions.cert, ca: httpsOptions.ca } }
+        : "https",
       port: 3000,
       static: [path.join(__dirname, "dist")],
     },

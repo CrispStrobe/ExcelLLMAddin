@@ -11,10 +11,17 @@ temp files, and none of the encoding pain of the legacy `.xlam`.
 ## What you get
 
 - `=LLM.PROMPT(text, [provider], [model])` — ask an LLM from a cell
+- `=LLM.CLASSIFY(text, categories)` — pick one label from a range/list
+- `=LLM.EXTRACT(text, instruction)` — pull a value out of text
+- `=LLM.TRANSLATE(text, language)` — translate a cell
+- `=LLM.SUMMARIZE(text, [maxWords])` — summarize a cell
+- `=LLM.MAP(range, instruction)` — apply an instruction to every cell, spilling results
 - `=LLM.LIST_MODELS([provider])` — spill available models
 - `=LLM.CONFIG()` — show the active provider/model
 - A task pane (Home ▸ **LLM Settings**) to pick provider, model, key, or proxy
 - Providers: OpenAI, Mistral, Nebius, Scaleway, OpenRouter, Ollama (local)
+
+To ship it to users (hosting, org deployment, AppSource), see **[PUBLISHING.md](PUBLISHING.md)**.
 
 ## Prerequisites
 
