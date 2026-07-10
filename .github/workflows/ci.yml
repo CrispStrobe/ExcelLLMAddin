@@ -1,0 +1,74 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+jobs:
+  officejs:
+    name: Office.js build + tests (all platforms, no Excel)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: officejs
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install
+        run: npm install --no-audit --no-fund
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Unit + functional tests
+        run: npm test
+      - name: Production build
+        run: npm run build
+
+  vba-tests:
+    name: VBA unit + functional tests (Windows/Excel)
+    # Requires a Windows runner with Desktop Excel installed. GitHub-hosted
+    # runners do NOT ship Excel, so use a self-hosted runner labelled 'excel'
+    # (a Windows box with Microsoft 365 / Excel Desktop).
+    runs-on: [self-hosted, windows, excel]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run VBA test harness
+        shell: pwsh
+        run: ./tools/Run-Tests.ps1
+
+      - name: Publish test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: test-results.xml
+
+  # Lightweight, cross-platform static checks that DON'T need Excel. These run on
+  # every push on GitHub-hosted runners and catch obvious breakage fast.
+  lint:
+    name: Source sanity checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check every module compiles-clean essentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          fail=0
+          # Every .bas/.cls (except vendored) must declare Option Explicit.
+          for f in *.bas *.cls; do
+            case "$f" in vendor/*) continue;; esac
+            if ! grep -q "Option Explicit" "$f"; then
+              echo "::error file=$f::missing 'Option Explicit'"; fail=1
+            fi
+          done
+          # Class modules must carry the VERSION/Attribute header or they won't import.
+          for f in *.cls; do
+            if ! head -1 "$f" | grep -q "VERSION 1.0 CLASS"; then
+              echo "::error file=$f::missing class header"; fail=1
+            fi
+          done
+          exit $fail

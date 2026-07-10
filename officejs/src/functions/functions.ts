@@ -1,0 +1,170 @@
+// Excel custom functions. JSDoc @customfunction tags are read at build time by
+// custom-functions-metadata-plugin to generate functions.json. Each function is
+// explicitly associated by id so registration is deterministic.
+//
+// Runtime note: the custom-functions runtime provides a global `fetch`; we adapt
+// it to the core's injectable FetchLike so the same tested code path runs here.
+
+import { runPrompt, listModels, LlmSettings } from "../core/llm";
+import { classify, extract, translate, summarize, mapRange } from "../core/tasks";
+import { loadSettings } from "../core/config";
+import { browserFetch as fetchLike } from "../browserFetch";
+
+/* global CustomFunctions */
+
+async function currentSettings(provider?: string, model?: string): Promise<LlmSettings> {
+  const s = await loadSettings();
+  return {
+    ...s,
+    provider: (provider && provider.trim()) || s.provider,
+    model: (model && model.trim()) || s.model,
+    baseUrl: s.baseUrl || undefined,
+    apiKey: s.apiKey || undefined,
+    proxyUrl: s.proxyUrl || undefined,
+    systemPrompt: s.systemPrompt || undefined,
+  };
+}
+
+function errorText(e: unknown): string {
+  return "Error: " + (e instanceof Error ? e.message : String(e));
+}
+
+/**
+ * Sends a prompt to the configured LLM and returns its reply.
+ * @customfunction PROMPT
+ * @param text The prompt text (or a cell reference).
+ * @param provider Optional provider id (openai, mistral, nebius, scaleway, openrouter, ollama).
+ * @param model Optional model name.
+ * @returns The model's reply.
+ */
+export async function prompt(text: string, provider?: string, model?: string): Promise<string> {
+  try {
+    return await runPrompt(text, await currentSettings(provider, model), { fetch: fetchLike });
+  } catch (e) {
+    return errorText(e);
+  }
+}
+
+/**
+ * Lists available models for a provider, spilling one per row.
+ * @customfunction LIST_MODELS
+ * @param provider Optional provider id; defaults to the configured provider.
+ * @returns A single-column list of model ids.
+ */
+export async function listModelsFn(provider?: string): Promise<string[][]> {
+  try {
+    const models = await listModels(await currentSettings(provider), { fetch: fetchLike });
+    return models.length ? models.map((m) => [m]) : [["(no models)"]];
+  } catch (e) {
+    return [[errorText(e)]];
+  }
+}
+
+/**
+ * Shows the current provider and model.
+ * @customfunction CONFIG
+ * @returns Provider and model summary.
+ */
+export async function config(): Promise<string> {
+  const s = await loadSettings();
+  return `Provider: ${s.provider} | Model: ${s.model}` + (s.proxyUrl ? " | via proxy" : "");
+}
+
+/**
+ * Classifies text into exactly one of the given category labels.
+ * @customfunction CLASSIFY
+ * @param text The text to classify (or a cell reference).
+ * @param categories A range or array of candidate labels.
+ * @returns The chosen label.
+ */
+export async function classifyFn(text: string, categories: string[][]): Promise<string> {
+  try {
+    return await classify(text, flatten(categories), await currentSettings(), { fetch: fetchLike });
+  } catch (e) {
+    return errorText(e);
+  }
+}
+
+/**
+ * Extracts a requested value from text.
+ * @customfunction EXTRACT
+ * @param text The source text (or a cell reference).
+ * @param instruction What to extract, e.g. "the email address".
+ * @returns The extracted value, or empty if not found.
+ */
+export async function extractFn(text: string, instruction: string): Promise<string> {
+  try {
+    return await extract(text, instruction, await currentSettings(), { fetch: fetchLike });
+  } catch (e) {
+    return errorText(e);
+  }
+}
+
+/**
+ * Translates text into a target language.
+ * @customfunction TRANSLATE
+ * @param text The text to translate (or a cell reference).
+ * @param targetLanguage The target language, e.g. "German".
+ * @returns The translation.
+ */
+export async function translateFn(text: string, targetLanguage: string): Promise<string> {
+  try {
+    return await translate(text, targetLanguage, await currentSettings(), { fetch: fetchLike });
+  } catch (e) {
+    return errorText(e);
+  }
+}
+
+/**
+ * Summarizes text, optionally capped to a word count.
+ * @customfunction SUMMARIZE
+ * @param text The text to summarize (or a cell reference).
+ * @param maxWords Optional maximum number of words.
+ * @returns The summary.
+ */
+export async function summarizeFn(text: string, maxWords?: number): Promise<string> {
+  try {
+    return await summarize(text, maxWords, await currentSettings(), { fetch: fetchLike });
+  } catch (e) {
+    return errorText(e);
+  }
+}
+
+/**
+ * Applies an instruction to every cell of a range, spilling the results.
+ * Cells are batched into few calls (with a per-cell fallback) to keep it fast.
+ * @customfunction MAP
+ * @param range The range of input values.
+ * @param instruction The instruction to apply to each cell.
+ * @returns A range of results with the same shape as the input.
+ */
+export async function mapFn(range: string[][], instruction: string): Promise<string[][]> {
+  try {
+    return await mapRange(range, instruction, await currentSettings(), { fetch: fetchLike });
+  } catch (e) {
+    return [[errorText(e)]];
+  }
+}
+
+function flatten(grid: string[][]): string[] {
+  const out: string[] = [];
+  for (const row of grid || []) {
+    for (const cell of row || []) {
+      const s = String(cell ?? "").trim();
+      if (s === "") continue;
+      // Allow a single "a, b, c" cell as well as a range of labels.
+      if (s.includes(",")) out.push(...s.split(",").map((x) => x.trim()).filter(Boolean));
+      else out.push(s);
+    }
+  }
+  return out;
+}
+
+CustomFunctions.associate("PROMPT", prompt);
+CustomFunctions.associate("LIST_MODELS", listModelsFn);
+CustomFunctions.associate("CONFIG", config);
+CustomFunctions.associate("CLASSIFY", classifyFn);
+CustomFunctions.associate("EXTRACT", extractFn);
+CustomFunctions.associate("TRANSLATE", translateFn);
+CustomFunctions.associate("SUMMARIZE", summarizeFn);
+CustomFunctions.associate("MAP", mapFn);

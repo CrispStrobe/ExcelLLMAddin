@@ -1,0 +1,94 @@
+:root {
+  --fg: #201f1e;
+  --muted: #605e5c;
+  --accent: #0f6cbd;
+  --ok: #0b6a0b;
+  --err: #a4262c;
+  --border: #d1d1d1;
+  --bg: #ffffff;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --fg: #f3f2f1;
+    --muted: #a19f9d;
+    --accent: #479ef5;
+    --ok: #6ccb5f;
+    --err: #f1707b;
+    --border: #3b3a39;
+    --bg: #1f1f1f;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+  font-size: 14px;
+  color: var(--fg);
+  background: var(--bg);
+}
+
+.pane { padding: 16px; max-width: 420px; }
+
+h1 { font-size: 18px; margin: 0 0 4px; }
+
+.hint { color: var(--muted); margin: 0 0 16px; }
+.muted { color: var(--muted); font-weight: normal; font-size: 12px; }
+
+label {
+  display: block;
+  margin: 12px 0 4px;
+  font-weight: 600;
+}
+
+input, select, textarea {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+}
+
+input:disabled { opacity: 0.5; }
+
+textarea { resize: vertical; }
+
+details { margin-top: 12px; }
+summary { cursor: pointer; color: var(--accent); margin: 8px 0; }
+
+.row { display: flex; gap: 8px; margin-top: 20px; }
+
+button {
+  padding: 8px 16px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+  cursor: pointer;
+}
+
+button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+button.link {
+  border: none;
+  background: none;
+  color: var(--accent);
+  padding: 0 0 0 6px;
+  font-size: 12px;
+  font-weight: normal;
+}
+
+.hidden { display: none; }
+#modelFilter, #modelSelect { margin-top: 6px; }
+#modelSelect option { padding: 2px 4px; }
+
+.status { margin-top: 16px; min-height: 1.2em; white-space: pre-wrap; word-break: break-word; }
+.status.ok { color: var(--ok); }
+.status.err { color: var(--err); }
+
+code { background: rgba(127,127,127,0.15); padding: 1px 4px; border-radius: 3px; }
