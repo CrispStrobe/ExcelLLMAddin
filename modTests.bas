@@ -65,6 +65,15 @@ Public Function RunAllTests(Optional ByVal showUI As Boolean = True) As Long
     Test_Cache_DifferentInputsMiss
     Test_Cache_ErrorsNotCached
 
+    ' --- task functions (modTasks) ---
+    Test_Task_Helpers
+    Test_Task_Classify
+    Test_Task_Extract
+    Test_Task_List
+    Test_Task_Fields
+    Test_Task_Cosine
+    Test_Task_Embed
+
     ' --- validation guards ---
     Test_Prompt_MissingApiKey
 
@@ -274,6 +283,79 @@ Private Sub Test_Cache_ErrorsNotCached()
 End Sub
 
 ' ---- framework --------------------------------------------------------------
+
+Private Sub Test_Task_Helpers()
+    Dim c As Collection
+    Set c = FlattenToStrings("a, b ,c")
+    AssertEqual "task/flatten count", "3", CStr(c.Count)
+    AssertEqual "task/flatten trims", "b", c(2)
+
+    Dim cats As New Collection
+    cats.Add "Positive": cats.Add "Negative"
+    AssertEqual "task/match exact (case-insensitive)", "Positive", MatchCategory("positive", cats)
+    AssertEqual "task/match contained", "Negative", MatchCategory("I'd say Negative", cats)
+
+    Dim arr As Collection
+    Set arr = ParseJsonStringArray("[""x"",""y"",""z""]")
+    AssertEqual "task/parse array count", "3", CStr(arr.Count)
+    AssertEqual "task/parse array item", "y", arr(2)
+    Set arr = ParseJsonStringArray("```json" & vbLf & "[""a"",""b""]" & vbLf & "```")
+    AssertEqual "task/parse array with fence", "a", arr(1)
+
+    Dim items As Collection
+    Set items = SplitLinesToItems("1. alpha" & vbLf & "2) beta" & vbLf & "- gamma")
+    AssertEqual "task/split lines strips prefixes", "beta", items(2)
+End Sub
+
+Private Sub Test_Task_Classify()
+    InstallMock "{""message"":{""content"":""Positive""}}"
+    AssertEqual "task/classify", "Positive", CLASSIFY("great product", "Positive,Negative", "ollama", "test-model")
+End Sub
+
+Private Sub Test_Task_Extract()
+    InstallMock "{""message"":{""content"":""   bob@x.com   ""}}"
+    AssertEqual "task/extract trims", "bob@x.com", EXTRACT("mail bob@x.com", "the email", "ollama", "test-model")
+End Sub
+
+Private Sub Test_Task_List()
+    InstallMock "{""message"":{""content"":""[\""red\"",\""green\"",\""blue\""]""}}"
+    Dim r As Variant
+    r = LIST("primary colors", 0, "ollama", "test-model")
+    AssertEqual "task/list first", "red", CStr(r(1, 1))
+    AssertEqual "task/list third", "blue", CStr(r(3, 1))
+End Sub
+
+Private Sub Test_Task_Fields()
+    InstallMock "{""message"":{""content"":""[\""Bob\"",\""bob@x.com\""]""}}"
+    Dim r As Variant
+    r = FIELDS("Bob bob@x.com", "name,email", "ollama", "test-model")
+    AssertEqual "task/fields name", "Bob", CStr(r(1, 1))
+    AssertEqual "task/fields email", "bob@x.com", CStr(r(1, 2))
+End Sub
+
+Private Sub Test_Task_Cosine()
+    Dim a As New Collection, b As New Collection
+    a.Add 1#: a.Add 2#: a.Add 3#
+    b.Add 1#: b.Add 2#: b.Add 3#
+    AssertEqual "task/cosine identical", "1", CStr(Round(Cosine(a, b), 4))
+
+    Dim c As New Collection, d As New Collection
+    c.Add 1#: c.Add 0#
+    d.Add 0#: d.Add 1#
+    AssertEqual "task/cosine orthogonal", "0", CStr(Round(Cosine(c, d), 4))
+End Sub
+
+Private Sub Test_Task_Embed()
+    InstallMock "{""data"":[{""embedding"":[1.0,2.0,3.0]}]}"
+    Dim v As Object
+    Set v = EmbedVector("hello", "some-model", "openai")
+    If v Is Nothing Then
+        AssertEqual "task/embed parses vector", "3", "(nothing)"
+    Else
+        AssertEqual "task/embed vector length", "3", CStr(v.Count)
+        AssertEqual "task/embed vector value", "2", CStr(v(2))
+    End If
+End Sub
 
 Private Function InstallMock(ByVal response As String) As MockHttpClient
     ' Fresh cache per test so cross-test prompts don't collide on cache keys.

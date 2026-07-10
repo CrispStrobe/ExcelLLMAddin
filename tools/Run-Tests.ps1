@@ -45,6 +45,7 @@ $modules = @(
     "modHttp.bas",
     "modConfig.bas",
     "modLLMFunctions.bas",
+    "modTasks.bas",
     "modMenu.bas",
     "modTests.bas"
 )

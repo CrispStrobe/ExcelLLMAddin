@@ -40,6 +40,14 @@ End Function
 ' users actually want. Identical (provider, model, prompt) inputs are additionally
 ' served from a session cache (see mCache / ClearLLMCache).
 Public Function prompt(promptText As String, Optional provider As String = "", Optional model As String = "") As String
+    prompt = ChatComplete(SYSTEM_PROMPT, promptText, provider, model)
+End Function
+
+' Core chat completion: system + user message -> assistant text. Shared by PROMPT
+' and every task function (CLASSIFY, EXTRACT, TRANSLATE, ...). Handles config,
+' model resolution, caching, request building and response parsing. Public so the
+' task modules can reuse it (it is not meant to be used directly in a cell).
+Public Function ChatComplete(systemMsg As String, userMsg As String, Optional provider As String = "", Optional model As String = "") As String
     On Error GoTo ErrorHandler
 
     EnsureConfig
@@ -55,29 +63,29 @@ Public Function prompt(promptText As String, Optional provider As String = "", O
     apiKey = GetAPIKey(provider)
 
     If baseURL = "" Then
-        prompt = "Error: Invalid provider '" & provider & "'"
+        ChatComplete = "Error: Invalid provider '" & provider & "'"
         Exit Function
     End If
 
     If apiKey = "" And provider <> "ollama" Then
-        prompt = "Error: No API key for " & provider
+        ChatComplete = "Error: No API key for " & provider
         Exit Function
     End If
 
-    ' Resolve an empty model against what the provider actually offers.
     If model = "" Then
         model = ResolveDefaultModel(provider)
         If Left$(model, 6) = "Error:" Then
-            prompt = model
+            ChatComplete = model
             Exit Function
         End If
     End If
 
-    ' Cache lookup (after validation/model-resolution so the key is fully bound).
+    ' Cache lookup -- the key includes the system message so different task prompts
+    ' (classify vs translate vs ...) don't collide.
     Dim cacheKey As String, cached As String
-    cacheKey = provider & "|" & model & "|" & promptText
+    cacheKey = provider & "|" & model & "|" & systemMsg & "|" & userMsg
     If TryGetCache(cacheKey, cached) Then
-        prompt = cached
+        ChatComplete = cached
         Exit Function
     End If
 
@@ -88,25 +96,75 @@ Public Function prompt(promptText As String, Optional provider As String = "", O
             endpoint = baseURL & "/chat/completions"
     End Select
 
-    jsonBody = BuildChatBody(model, SYSTEM_PROMPT, promptText, provider)
+    jsonBody = BuildChatBody(model, systemMsg, userMsg, provider)
 
     Dim client As IHttpClient
     Set client = modHttp.CreateHttpClient()
     response = client.PostJson(endpoint, jsonBody, apiKey, provider)
 
     If Left$(response, 6) = "Error:" Then
-        prompt = response
+        ChatComplete = response
         Exit Function
     End If
 
-    prompt = ExtractChatContent(response, provider)
+    ChatComplete = ExtractChatContent(response, provider)
 
     ' Only cache genuine successes so transient failures can retry.
-    If Left$(prompt, 6) <> "Error:" Then StoreCache cacheKey, prompt
+    If Left$(ChatComplete, 6) <> "Error:" Then StoreCache cacheKey, ChatComplete
     Exit Function
 
 ErrorHandler:
-    prompt = "Error: " & Err.Number & " - " & Err.Description
+    ChatComplete = "Error: " & Err.Number & " - " & Err.Description
+End Function
+
+' Embedding vector for SIMILARITY. Returns a Collection of Doubles, or Nothing on
+' error. Openai-style (/embeddings) and Ollama (/api/embeddings) response shapes.
+Public Function EmbedVector(text As String, embModel As String, Optional provider As String = "") As Object
+    On Error GoTo Fail
+
+    EnsureConfig
+    If provider = "" Then provider = CurrentProvider
+    provider = LCase(Trim(provider))
+    If embModel = "" Then Set EmbedVector = Nothing: Exit Function
+
+    Dim baseURL As String, apiKey As String, endpoint As String, response As String
+    baseURL = GetBaseURL(provider)
+    apiKey = GetAPIKey(provider)
+    If baseURL = "" Then Set EmbedVector = Nothing: Exit Function
+    If apiKey = "" And provider <> "ollama" Then Set EmbedVector = Nothing: Exit Function
+
+    Dim body As Object
+    Set body = New Dictionary
+    body.Add "model", embModel
+    If provider = "ollama" Then
+        endpoint = baseURL & "/api/embeddings"
+        body.Add "prompt", text
+    Else
+        endpoint = baseURL & "/embeddings"
+        body.Add "input", text
+    End If
+
+    Dim client As IHttpClient
+    Set client = modHttp.CreateHttpClient()
+    response = client.PostJson(endpoint, JsonConverter.ConvertToJson(body), apiKey, provider)
+    If Left$(response, 6) = "Error:" Then Set EmbedVector = Nothing: Exit Function
+
+    Dim root As Object, vec As Object
+    Set root = JsonConverter.ParseJson(response)
+    If root.Exists("data") Then
+        Set vec = root("data")(1)("embedding")          ' OpenAI style
+    ElseIf root.Exists("embedding") Then
+        Set vec = root("embedding")                      ' Ollama style
+    ElseIf root.Exists("embeddings") Then
+        Set vec = root("embeddings")(1)
+    Else
+        Set EmbedVector = Nothing: Exit Function
+    End If
+
+    Set EmbedVector = vec
+    Exit Function
+Fail:
+    Set EmbedVector = Nothing
 End Function
 
 ' =LIST_MODELS([provider]) -> newline-separated model ids.
