@@ -48,10 +48,12 @@ fi
 rm -f "$COMPONENT"
 rm -rf "$STAGE"
 
-if [ -n "${AC_KEY_ID:-}" ] && [ -n "${AC_ISSUER_ID:-}" ] && [ -n "${AC_KEY_PATH:-}" ]; then
+if [ -n "${SIGN_IDENTITY:-}" ] && [ -n "${AC_KEY_ID:-}" ] && [ -n "${AC_ISSUER_ID:-}" ] && [ -n "${AC_KEY_PATH:-}" ]; then
   echo "Notarizing $OUT ..."
   xcrun notarytool submit "$OUT" --key "$AC_KEY_PATH" --key-id "$AC_KEY_ID" --issuer "$AC_ISSUER_ID" --wait
   xcrun stapler staple "$OUT"
+else
+  echo "NOTE: not signed or no notary creds -> skipping notarization (unsigned .pkg is fine for personal/offline use; right-click > Open)."
 fi
 
 echo "Built: $OUT"

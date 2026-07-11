@@ -26,11 +26,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Import Developer ID Installer certificate
+      - name: Import Developer ID Installer certificate (if present)
         env:
           P12: ${{ secrets.APPLE_INSTALLER_CERT_P12 }}
           P12_PW: ${{ secrets.APPLE_CERT_PASSWORD }}
         run: |
+          if [ -z "$P12" ]; then
+            echo "No APPLE_INSTALLER_CERT_P12 secret -> building an UNSIGNED .pkg."
+            echo "(Add a Developer ID Installer cert to auto-sign + notarize.)"
+            exit 0
+          fi
           KEYCHAIN=build.keychain
           security create-keychain -p ci "$KEYCHAIN"
           security set-keychain-settings -lut 21600 "$KEYCHAIN"

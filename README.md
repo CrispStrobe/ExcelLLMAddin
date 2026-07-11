@@ -10,10 +10,14 @@ Mistral, Nebius, Scaleway, OpenRouter, or local Ollama).
 
 There are two editions in this repo:
 
-| Edition | Where | Status |
+| Edition | Where | Best for |
 |---|---|---|
-| **Office.js add-in** (`officejs/`) | Mac · Windows · Web · iPad | **Recommended** — the product |
-| Legacy VBA `.xlam` (repo root `.bas`) | Mac · Windows | Kept as a stopgap |
+| **Office.js add-in** (`officejs/`) | Mac · Windows · Web · iPad | store/AppSource, the widest reach, streaming |
+| **VBA `.xlam`** (repo root `.bas`) | Mac · Windows | **fully offline / air-gapped**, single-file install |
+
+Both have the function set *and* the sheet-editing agent. The `.xlam` runs with no
+hosting and no internet (pair it with local Ollama); the Office.js edition adds
+Web/iPad, AppSource, and `STREAM`.
 
 ## What it does
 
@@ -61,13 +65,26 @@ OpenAI · Mistral · Nebius · Scaleway · OpenRouter · Ollama (local). OpenRou
 Nebius, and local Ollama work directly from the browser; others use the optional
 key-custody proxy (`officejs/proxy/worker.js`).
 
-## Legacy VBA add-in
+## Offline VBA edition (`.xlam`)
 
-The original VBA `.xlam` still lives at the repo root (`modLLMFunctions.bas`,
-`modConfig.bas`, `modMenu.bas`, plus a testable HTTP layer under `vendor/` and a
-self-test harness in `modTests.bas`). It offers `=PROMPT()`, `=LIST_MODELS()`,
-`=LLM_CONFIG()` on Mac and Windows. Build it with `tools/Build-Addin.ps1` (Windows)
-or import the modules in the VBA editor. New work goes into `officejs/`.
+The VBA add-in (repo root `.bas`/`.cls`) is **fully self-contained and offline** —
+no hosting, no web server. It has near-parity with the Office.js edition:
+
+- Functions: `=PROMPT`, `=CLASSIFY`, `=EXTRACT`, `=TRANSLATE`, `=SUMMARIZE`,
+  `=SENTIMENT`, `=ASK`, `=LIST`, `=FIELDS`, `=MAP`, `=SIMILARITY`, `=LIST_MODELS`,
+  `=LLM_CONFIG` (`modLLMFunctions.bas`, `modTasks.bas`).
+- **Agent** (`modAgent.bas`) — run the `RunAgent` macro; the model edits the sheet
+  via native `Range` tools with approve-before-apply. With local Ollama, this is a
+  fully air-gapped AI that edits your workbook.
+- Solid plumbing: injected `IHttpClient` (WinHTTP/curl), real JSON (vendored
+  VBA-JSON), UTF-8, a response cache, and a `RunAllTests` self-test harness.
+- Not ported: `STREAM` (VBA UDFs are synchronous) and the MCP client.
+
+**Build:** `pwsh tools/Build-Addin.ps1` on Windows+Excel, or import the modules in
+the VBA editor and Save As `.xlam` (Excel is required to compile VBA — it can't be
+built on Mac or GitHub-hosted CI). **Install offline:** `installer/mac-xlam/`
+builds a `.pkg` that drops the `.xlam` into Excel's add-ins folder. See
+`installer/README.md`.
 
 ## License
 

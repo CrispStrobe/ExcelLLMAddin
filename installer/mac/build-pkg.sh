@@ -54,7 +54,7 @@ rm -f "$COMPONENT"
 rm -rf "$STAGE"
 
 # 5. Notarize + staple if App Store Connect API creds are provided.
-if [ -n "${AC_KEY_ID:-}" ] && [ -n "${AC_ISSUER_ID:-}" ] && [ -n "${AC_KEY_PATH:-}" ]; then
+if [ -n "${SIGN_IDENTITY:-}" ] && [ -n "${AC_KEY_ID:-}" ] && [ -n "${AC_ISSUER_ID:-}" ] && [ -n "${AC_KEY_PATH:-}" ]; then
   echo "Notarizing $OUT ..."
   xcrun notarytool submit "$OUT" \
     --key "$AC_KEY_PATH" --key-id "$AC_KEY_ID" --issuer "$AC_ISSUER_ID" --wait

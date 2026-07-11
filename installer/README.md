@@ -19,8 +19,33 @@ AC_KEY_ID=.. AC_ISSUER_ID=.. AC_KEY_PATH=AuthKey_XXXX.p8 \
 installer/mac-xlam/build-xlam-pkg.sh          # signed + notarized
 ```
 
-CI: `.github/workflows/installer-mac.yml` builds, signs, and notarizes it on a
-`macos-latest` runner from your Apple secrets.
+CI: `.github/workflows/installer-mac.yml` builds it on a `macos-latest` runner. It
+produces an **unsigned** `.pkg` by default, and **auto-signs + notarizes** if a
+Developer ID Installer cert secret is present (see Signing below).
+
+## Signing status
+
+Two levels, pick per audience:
+
+- **Unsigned** (default, no cert needed) — installs fine for personal/offline use;
+  Gatekeeper's first-open needs a right-click ▸ Open (or `xattr -dr
+  com.apple.quarantine ExcelLLMAddin-Offline.pkg`). The build here and in CI
+  produce this today.
+- **Signed + notarized** (for public download) — needs a **Developer ID Installer**
+  certificate. Note: the Mac App Store certs (`Apple Distribution`, `3rd Party Mac
+  Developer Installer`) do **not** work for direct distribution. Create a Developer
+  ID Installer cert in the Apple Developer portal (an Account-Holder decision;
+  Developer ID slots are limited and account-wide), export it as a `.p12`, and add
+  these repo secrets:
+
+  | Secret | Value |
+  |---|---|
+  | `APPLE_INSTALLER_CERT_P12` | base64 of the `.p12` |
+  | `APPLE_CERT_PASSWORD` | its password |
+  | `APPLE_SIGN_IDENTITY` | e.g. `Developer ID Installer: Name (TEAMID)` |
+  | `AC_KEY_ID`, `AC_ISSUER_ID`, `AC_KEY_P8` | App Store Connect API key (for notarization) — **already set** |
+
+  Once the cert secret is present, the CI signs + notarizes automatically.
 
 ## `mac/` — Office.js manifest (online, cross-platform)
 
