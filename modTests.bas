@@ -72,6 +72,11 @@ Public Function RunAllTests(Optional ByVal showUI As Boolean = True) As Long
     Test_Task_List
     Test_Task_Fields
     Test_Task_TolerantArray
+    Test_Task_Tag
+    Test_Task_Edit
+    Test_Task_Formula
+    Test_Task_Table
+    Test_Task_Fill
     Test_Task_Cosine
     Test_Task_Embed
 
@@ -365,6 +370,42 @@ Private Sub Test_Task_TolerantArray()
     Set w = ParseJsonStringArray("[""a"", ""b"" , ]")
     AssertTrue "task/tolerant ws-comma not nothing", Not (w Is Nothing)
     AssertEqual "task/tolerant ws-comma count", "2", CStr(w.Count)
+End Sub
+
+Private Sub Test_Task_Tag()
+    InstallMock "{""message"":{""content"":""Billing and Feature apply here""}}"
+    AssertEqual "task/tag multi-label", "Billing, Feature", TAG("...", "Bug,Billing,Feature", "ollama", "test-model")
+End Sub
+
+Private Sub Test_Task_Edit()
+    InstallMock "{""message"":{""content"":""  Their house is nice.  ""}}"
+    AssertEqual "task/edit trims", "Their house is nice.", EDIT("theyre house is nice", "", "ollama", "test-model")
+End Sub
+
+Private Sub Test_Task_Formula()
+    ' Model wraps the formula in a code fence; CleanFormula must strip it.
+    InstallMock "{""message"":{""content"":""```\n=SUM(A2:A10)\n```""}}"
+    AssertEqual "task/formula strips fences", "=SUM(A2:A10)", FORMULA("sum A2:A10", "ollama", "test-model")
+End Sub
+
+Private Sub Test_Task_Table()
+    InstallMock "{""message"":{""content"":""[[\""A\"",\""B\""],[\""1\"",\""2\""]]""}}"
+    Dim r As Variant
+    r = LLMTABLE("make a table", "ollama", "test-model")
+    AssertEqual "task/table header", "A", CStr(r(1, 1))
+    AssertEqual "task/table cell", "2", CStr(r(2, 2))
+End Sub
+
+Private Sub Test_Task_Fill()
+    InstallMock "{""message"":{""content"":""[\""FR\"",\""ES\""]""}}"
+    Dim ex(1 To 1, 1 To 2) As Variant
+    ex(1, 1) = "Germany": ex(1, 2) = "DE"
+    Dim ins(1 To 2, 1 To 1) As Variant
+    ins(1, 1) = "France": ins(2, 1) = "Spain"
+    Dim r As Variant
+    r = FILL(ex, ins, "ollama", "test-model")
+    AssertEqual "task/fill FR", "FR", CStr(r(1, 1))
+    AssertEqual "task/fill ES", "ES", CStr(r(2, 1))
 End Sub
 
 Private Sub Test_Task_Cosine()

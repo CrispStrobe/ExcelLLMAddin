@@ -63,6 +63,168 @@ Public Function SENTIMENT(text As String, Optional provider As String = "", Opti
     SENTIMENT = CLASSIFY(text, "Positive,Neutral,Negative", provider, model)
 End Function
 
+' =TAG(text, categories, ...) -> comma-separated matching labels (multi-label).
+Public Function TAG(text As String, categories As Variant, Optional provider As String = "", Optional model As String = "") As String
+    On Error GoTo Fail
+    Dim cats As Collection
+    Set cats = FlattenToStrings(categories)
+    If cats.Count = 0 Then TAG = "Error: no categories provided": Exit Function
+
+    Dim labels As String, i As Long
+    For i = 1 To cats.Count
+        labels = labels & IIf(i > 1, ", ", "") & cats(i)
+    Next i
+
+    Dim sys As String
+    sys = "Apply labels to the text. Choose ALL that apply from: " & labels & ". " & _
+          "Return only the matching labels as a comma-separated list, in the given order. If none apply, return nothing."
+    Dim out As String
+    out = ChatComplete(sys, "Text:" & vbLf & text, provider, model)
+    If Left$(out, 6) = "Error:" Then TAG = out: Exit Function
+
+    ' Keep only recognized labels (order-preserving) so the result is always clean.
+    Dim lc As String, res As String
+    lc = LCase$(out)
+    For i = 1 To cats.Count
+        If InStr(lc, LCase$(cats(i))) > 0 Then res = res & IIf(res = "", "", ", ") & cats(i)
+    Next i
+    TAG = res
+    Exit Function
+Fail:
+    TAG = "Error: " & Err.Description
+End Function
+
+' =EDIT(text, [instruction], ...) -> revised text (default: fix spelling & grammar).
+Public Function EDIT(text As String, Optional instruction As String = "", Optional provider As String = "", Optional model As String = "") As String
+    Dim what As String
+    what = Trim$(instruction)
+    If what = "" Then what = "Fix spelling and grammar"
+    Dim sys As String
+    sys = "You are an editor. Apply the requested edit and output ONLY the revised text -- no notes or quotes."
+    EDIT = TrimResult(ChatComplete(sys, "Edit instruction: " & what & vbLf & vbLf & "Text:" & vbLf & text, provider, model))
+End Function
+
+' =FORMULA(description, ...) -> an Excel formula string.
+Public Function FORMULA(description As String, Optional provider As String = "", Optional model As String = "") As String
+    Dim sys As String
+    sys = "You write Microsoft Excel formulas. Output ONLY a single Excel formula that " & _
+          "starts with '=' -- no explanation, no code fences, no surrounding text. Prefer " & _
+          "standard, widely-supported functions."
+    Dim out As String
+    out = ChatComplete(sys, "Write an Excel formula that: " & description, provider, model)
+    If Left$(out, 6) = "Error:" Then FORMULA = out: Exit Function
+    FORMULA = CleanFormula(out)
+End Function
+
+' =EXPLAIN(formula, ...) -> plain-English explanation. Tip: =EXPLAIN(FORMULATEXT(A1)).
+Public Function EXPLAIN(formula As String, Optional provider As String = "", Optional model As String = "") As String
+    Dim sys As String
+    sys = "Explain what the given Excel formula does, in plain English and concisely " & _
+          "(2-3 sentences max). Output only the explanation."
+    EXPLAIN = TrimResult(ChatComplete(sys, "Explain this Excel formula:" & vbLf & formula, provider, model))
+End Function
+
+' =LLMTABLE(prompt, ...) -> spills a 2D grid (first row = headers). Named LLMTABLE
+' because a bare TABLE collides with Excel's legacy Data Table function.
+Public Function LLMTABLE(promptText As String, Optional provider As String = "", Optional model As String = "") As Variant
+    On Error GoTo Fail
+    Dim sys As String
+    sys = "Generate tabular data as a JSON array of arrays: each inner array is one row " & _
+          "of string cells, and the first row is the column headers. Keep every row the " & _
+          "same length. Return ONLY the JSON -- no commentary or code fences."
+    Dim raw As String
+    raw = ChatComplete(sys, promptText, provider, model)
+    If Left$(raw, 6) = "Error:" Then LLMTABLE = raw: Exit Function
+    Dim grid As Variant
+    grid = ParseJsonGrid(raw)
+    If IsEmpty(grid) Then LLMTABLE = "Error: could not parse a table from the response": Exit Function
+    LLMTABLE = grid
+    Exit Function
+Fail:
+    LLMTABLE = "Error: " & Err.Description
+End Function
+
+' =FILL(examples, inputs, ...) -> infer a pattern from (input,output) example pairs
+' and apply it to new inputs. examples is a two-column range; inputs is a range.
+Public Function FILL(examples As Variant, inputs As Variant, Optional provider As String = "", Optional model As String = "") As Variant
+    On Error GoTo Fail
+
+    ' Collect example (input, output) pairs into a numbered block.
+    Dim exBlock As String, nEx As Long
+    If IsArray(examples) Then
+        Dim er As Long, c0 As Long
+        c0 = LBound(examples, 2)
+        For er = LBound(examples, 1) To UBound(examples, 1)
+            Dim ei As String, eo As String
+            ei = Trim$(CStr(examples(er, c0)))
+            eo = Trim$(CStr(examples(er, c0 + 1)))
+            If ei <> "" And eo <> "" Then
+                nEx = nEx + 1
+                exBlock = exBlock & nEx & ". IN: " & ei & "  =>  OUT: " & eo & vbLf
+            End If
+        Next er
+    End If
+    If nEx = 0 Then FILL = "Error: need at least one example (input, output) pair": Exit Function
+
+    ' Flatten inputs (row-major) and remember the shape for the output.
+    Dim flat As Collection: Set flat = New Collection
+    Dim isArr As Boolean: isArr = IsArray(inputs)
+    Dim rr As Long, cc As Long
+    If isArr Then
+        For rr = LBound(inputs, 1) To UBound(inputs, 1)
+            For cc = LBound(inputs, 2) To UBound(inputs, 2)
+                flat.Add CStr(inputs(rr, cc))
+            Next cc
+        Next rr
+    Else
+        flat.Add CStr(inputs)
+    End If
+    If flat.Count = 0 Then FILL = "": Exit Function
+
+    ' One batched call, JSON array of outputs.
+    Dim inBlock As String, i As Long
+    For i = 1 To flat.Count
+        inBlock = inBlock & i & ". " & flat(i) & vbLf
+    Next i
+    Dim sys As String
+    sys = "Infer the transformation from the examples and apply it to each new input. " & _
+          "Return ONLY a JSON array of output strings, exactly one per input, in order. No commentary."
+    Dim user As String
+    user = "Examples:" & vbLf & exBlock & vbLf & _
+           "Apply the same transformation to these inputs and return a JSON array of exactly " & _
+           flat.Count & " strings:" & vbLf & inBlock
+    Dim raw As String
+    raw = ChatComplete(sys, user, provider, model)
+
+    Dim results As Collection
+    Set results = Nothing
+    If Left$(raw, 6) <> "Error:" Then Set results = ParseJsonStringArray(raw)
+    If results Is Nothing Then
+        Set results = FillPerInput(exBlock, flat, provider, model)
+    ElseIf results.Count <> flat.Count Then
+        Set results = FillPerInput(exBlock, flat, provider, model)
+    End If
+
+    ' Reshape results back to the inputs' shape.
+    If isArr Then
+        Dim outArr() As String
+        ReDim outArr(LBound(inputs, 1) To UBound(inputs, 1), LBound(inputs, 2) To UBound(inputs, 2))
+        Dim k As Long: k = 1
+        For rr = LBound(inputs, 1) To UBound(inputs, 1)
+            For cc = LBound(inputs, 2) To UBound(inputs, 2)
+                outArr(rr, cc) = CStr(results(k))
+                k = k + 1
+            Next cc
+        Next rr
+        FILL = outArr
+    Else
+        FILL = CStr(results(1))
+    End If
+    Exit Function
+Fail:
+    FILL = "Error: " & Err.Description
+End Function
+
 ' =ASK(question, context, ...) -> answer using the context range/text.
 Public Function ASK(question As String, context As Variant, Optional provider As String = "", Optional model As String = "") As String
     Dim ctx As String
@@ -366,6 +528,102 @@ Public Function ParseJsonStringArray(raw As String) As Collection
     Exit Function
 Fail:
     Set ParseJsonStringArray = Nothing
+End Function
+
+' Pull a clean "=..." formula out of a model reply (strip fences/backticks/prose).
+Private Function CleanFormula(ByVal raw As String) As String
+    Dim s As String
+    s = Trim$(raw)
+    s = Replace(s, "```excel", "")
+    s = Replace(s, "```json", "")
+    s = Replace(s, "```vba", "")
+    s = Replace(s, "```", "")
+    s = Replace(s, "`", "")
+    s = Trim$(s)
+    Dim eq As Long
+    eq = InStr(s, "=")
+    If eq > 0 Then s = Mid$(s, eq)   ' drop any leading prose before '='
+    Dim lf As Long
+    lf = InStr(s, vbLf)
+    If lf > 0 Then s = Left$(s, lf - 1)   ' formula is a single line
+    lf = InStr(s, vbCr)
+    If lf > 0 Then s = Left$(s, lf - 1)
+    s = Trim$(s)
+    If s <> "" And Left$(s, 1) <> "=" Then s = "=" & s
+    CleanFormula = s
+End Function
+
+' Parse a JSON array-of-arrays into a 1-based 2D String array; Empty on failure.
+Private Function ParseJsonGrid(ByVal raw As String) As Variant
+    On Error GoTo Fail
+    Dim s As String
+    s = Trim$(raw)
+    Dim p As Long
+    p = InStr(s, "```")
+    If p > 0 Then
+        s = Mid$(s, p + 3)
+        If LCase$(Left$(s, 4)) = "json" Then s = Mid$(s, 5)
+        Dim ef As Long
+        ef = InStr(s, "```")
+        If ef > 0 Then s = Left$(s, ef - 1)
+        s = Trim$(s)
+    End If
+
+    Dim st As Long, en As Long
+    st = InStr(s, "[")
+    en = InStrRev(s, "]")
+    If st = 0 Or en <= st Then ParseJsonGrid = Empty: Exit Function
+
+    Dim sliced As String
+    sliced = Mid$(s, st, en - st + 1)
+    Dim outer As Object
+    Set outer = TryParseJsonArray(sliced)
+    If outer Is Nothing Then Set outer = TryParseJsonArray(StripTrailingComma(sliced))
+    If outer Is Nothing Then ParseJsonGrid = Empty: Exit Function
+    If outer.Count = 0 Then ParseJsonGrid = Empty: Exit Function
+
+    Dim nRows As Long, nCols As Long, r As Long, c As Long
+    nRows = outer.Count
+
+    ' VBA-JSON returns arrays as Collections; a row is itself a Collection.
+    If IsObject(outer(1)) Then
+        nCols = outer(1).Count
+        Dim grid() As String
+        ReDim grid(1 To nRows, 1 To nCols)
+        For r = 1 To nRows
+            Dim row As Object
+            Set row = outer(r)
+            For c = 1 To nCols
+                If c <= row.Count Then grid(r, c) = CStr(row(c)) Else grid(r, c) = ""
+            Next c
+        Next r
+        ParseJsonGrid = grid
+    Else
+        ' Flat array -> single column.
+        Dim col() As String
+        ReDim col(1 To nRows, 1 To 1)
+        For r = 1 To nRows
+            col(r, 1) = CStr(outer(r))
+        Next r
+        ParseJsonGrid = col
+    End If
+    Exit Function
+Fail:
+    ParseJsonGrid = Empty
+End Function
+
+' Fallback for FILL: apply the transformation one input at a time.
+Private Function FillPerInput(ByVal exBlock As String, ByVal flat As Collection, _
+                              ByVal provider As String, ByVal model As String) As Collection
+    Dim c As New Collection, i As Long, one As String
+    Dim sys As String
+    sys = "Infer the transformation from the examples and output ONLY the result for the " & _
+          "new input -- plain text, no labels or quotes."
+    For i = 1 To flat.Count
+        one = ChatComplete(sys, exBlock & "IN: " & flat(i) & "  =>  OUT:", provider, model)
+        If Left$(one, 6) = "Error:" Then c.Add one Else c.Add Trim$(one)
+    Next i
+    Set FillPerInput = c
 End Function
 
 ' Parse a JSON array, returning Nothing instead of raising on malformed input.
