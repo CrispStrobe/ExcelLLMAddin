@@ -250,7 +250,7 @@ Public Sub InitializeDefaults()
     ' URLs - ALWAYS set
     OPENAI_URL = "https://api.openai.com/v1"
     MISTRAL_URL = "https://api.mistral.ai/v1"
-    NEBIUS_URL = "https://api.studio.nebius.ai/v1"
+    NEBIUS_URL = "https://api.studio.nebius.com/v1"
     SCALEWAY_URL = "https://api.scaleway.ai/v1"
     OPENROUTER_URL = "https://openrouter.ai/api/v1"
     OLLAMA_BASE_URL = "http://localhost:11434"

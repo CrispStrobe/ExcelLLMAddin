@@ -1,0 +1,18 @@
+{
+  "$comment": "Single source of truth for LLM provider specs across all editions. Edit here, then run `npm run gen:providers` (in officejs/) to regenerate the TS catalog and the proxy worker's table. The VBA edition is checked against this file by providers.gen.test.ts. Fields: id, label, defaultBaseUrl, requiresKey, style (openai|ollama), browserFriendly (CORS-callable direct from a browser), keyEnv (proxy env var holding the API key; null if none).",
+  "providers": [
+    { "id": "openai", "label": "OpenAI", "defaultBaseUrl": "https://api.openai.com/v1", "requiresKey": true, "style": "openai", "browserFriendly": false, "keyEnv": "OPENAI_API_KEY" },
+    { "id": "mistral", "label": "Mistral", "defaultBaseUrl": "https://api.mistral.ai/v1", "requiresKey": true, "style": "openai", "browserFriendly": false, "keyEnv": "MISTRAL_API_KEY" },
+    { "id": "nebius", "label": "Nebius", "defaultBaseUrl": "https://api.studio.nebius.com/v1", "requiresKey": true, "style": "openai", "browserFriendly": true, "keyEnv": "NEBIUS_API_KEY" },
+    { "id": "scaleway", "label": "Scaleway", "defaultBaseUrl": "https://api.scaleway.ai/v1", "requiresKey": true, "style": "openai", "browserFriendly": false, "keyEnv": "SCALEWAY_API_KEY" },
+    { "id": "openrouter", "label": "OpenRouter", "defaultBaseUrl": "https://openrouter.ai/api/v1", "requiresKey": true, "style": "openai", "browserFriendly": true, "keyEnv": "OPENROUTER_API_KEY" },
+    { "id": "groq", "label": "Groq", "defaultBaseUrl": "https://api.groq.com/openai/v1", "requiresKey": true, "style": "openai", "browserFriendly": false, "keyEnv": "GROQ_API_KEY" },
+    { "id": "together", "label": "Together AI", "defaultBaseUrl": "https://api.together.xyz/v1", "requiresKey": true, "style": "openai", "browserFriendly": false, "keyEnv": "TOGETHER_API_KEY" },
+    { "id": "cerebras", "label": "Cerebras", "defaultBaseUrl": "https://api.cerebras.ai/v1", "requiresKey": true, "style": "openai", "browserFriendly": false, "keyEnv": "CEREBRAS_API_KEY" },
+    { "id": "gemini", "label": "Google Gemini", "defaultBaseUrl": "https://generativelanguage.googleapis.com/v1beta/openai", "requiresKey": true, "style": "openai", "browserFriendly": false, "keyEnv": "GEMINI_API_KEY" },
+    { "id": "cohere", "label": "Cohere", "defaultBaseUrl": "https://api.cohere.ai/compatibility/v1", "requiresKey": true, "style": "openai", "browserFriendly": false, "keyEnv": "COHERE_API_KEY" },
+    { "id": "huggingface", "label": "Hugging Face", "defaultBaseUrl": "https://router.huggingface.co/v1", "requiresKey": true, "style": "openai", "browserFriendly": false, "keyEnv": "HF_TOKEN" },
+    { "id": "requesty", "label": "Requesty", "defaultBaseUrl": "https://router.requesty.ai/v1", "requiresKey": true, "style": "openai", "browserFriendly": false, "keyEnv": "REQUESTY_API_KEY" },
+    { "id": "ollama", "label": "Ollama (local)", "defaultBaseUrl": "http://localhost:11434", "requiresKey": false, "style": "ollama", "browserFriendly": true, "keyEnv": null }
+  ]
+}

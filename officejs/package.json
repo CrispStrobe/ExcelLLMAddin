@@ -16,6 +16,8 @@
     "stop": "office-addin-debugging stop manifest.xml",
     "validate": "office-addin-manifest validate manifest.xml",
     "typecheck": "tsc --noEmit",
+    "gen:providers": "node tools/gen-providers.cjs",
+    "check:providers": "node tools/gen-providers.cjs --check",
     "harness:smoke": "node tools/drive-harness.cjs",
     "check:ui": "node tools/check-ui.cjs"
   },

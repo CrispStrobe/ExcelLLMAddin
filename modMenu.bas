@@ -338,7 +338,7 @@ Private Sub ConfigureProvider(providerKey As String, providerName As String)
             If defaultURL = "" Then defaultURL = "https://api.mistral.ai/v1"
             suggestedModel = "mistral-small-latest"
         Case "nebius"
-            If defaultURL = "" Then defaultURL = "https://api.studio.nebius.ai/v1"
+            If defaultURL = "" Then defaultURL = "https://api.studio.nebius.com/v1"
             suggestedModel = "meta-llama/Llama-3.3-70B-Instruct"
         Case "scaleway"
             If defaultURL = "" Then defaultURL = "https://api.scaleway.ai/v1"
