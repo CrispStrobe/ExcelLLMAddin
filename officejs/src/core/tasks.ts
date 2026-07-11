@@ -83,6 +83,99 @@ export async function sentiment(
   return classify(text, ["Positive", "Neutral", "Negative"], settings, deps);
 }
 
+/** Apply ALL matching labels from a set (multi-label). Returns a comma-joined subset. */
+export async function tagText(
+  text: string,
+  categories: string[],
+  settings: LlmSettings,
+  deps: Deps
+): Promise<string> {
+  const cats = categories.map((c) => String(c).trim()).filter(Boolean);
+  if (cats.length === 0) return "Error: no categories provided";
+  const system =
+    `Apply labels to the text. Choose ALL that apply from: ${cats.join(", ")}. ` +
+    "Return only the matching labels as a comma-separated list, in the given order. If none apply, return nothing.";
+  const out = await runPrompt(`Text:\n${text}`, withSystem(settings, system), deps);
+  // Keep only recognized labels (order-preserving) so the result is always clean.
+  const lc = out.toLowerCase();
+  return cats.filter((c) => lc.includes(c.toLowerCase())).join(", ");
+}
+
+/** Rewrite/edit text per an instruction (default: fix spelling & grammar). */
+export async function editText(
+  text: string,
+  instruction: string | undefined,
+  settings: LlmSettings,
+  deps: Deps
+): Promise<string> {
+  const what = instruction && instruction.trim() ? instruction.trim() : "Fix spelling and grammar";
+  const system = "You are an editor. Apply the requested edit and output ONLY the revised text — no notes or quotes.";
+  const out = await runPrompt(`Edit instruction: ${what}\n\nText:\n${text}`, withSystem(settings, system), deps);
+  return out.trim();
+}
+
+/** Generate a 2D table from a prompt; first row is headers. Spills as a grid. */
+export async function generateTable(
+  prompt: string,
+  settings: LlmSettings,
+  deps: Deps
+): Promise<string[][]> {
+  const system =
+    "Generate tabular data as a JSON array of arrays: each inner array is one row " +
+    "of string cells, and the first row is the column headers. Keep every row the " +
+    "same length. Return ONLY the JSON — no commentary or code fences.";
+  const raw = await runPrompt(prompt, withSystem(settings, system), deps);
+  const grid = parseGrid(raw);
+  return grid ?? [["Error: could not parse a table from the response"]];
+}
+
+/**
+ * Infer the pattern from example input→output pairs and apply it to new inputs
+ * (Numerous-style "fill by example"). Batches into one call with a per-input fallback.
+ */
+export async function fillByExample(
+  examples: Array<{ input: string; output: string }>,
+  inputs: string[],
+  settings: LlmSettings,
+  deps: Deps
+): Promise<string[]> {
+  const ex = examples.filter((e) => e.input.trim() !== "" && e.output.trim() !== "");
+  if (ex.length === 0) return inputs.map(() => "Error: need at least one example (input, output) pair");
+  if (inputs.length === 0) return [];
+
+  const system =
+    "Infer the transformation from the examples and apply it to each new input. " +
+    "Return ONLY a JSON array of output strings, exactly one per input, in order. No commentary.";
+  const exBlock = ex.map((e, i) => `${i + 1}. IN: ${e.input}  =>  OUT: ${e.output}`).join("\n");
+  const inBlock = inputs.map((t, i) => `${i + 1}. ${t}`).join("\n");
+  const user =
+    `Examples:\n${exBlock}\n\n` +
+    `Apply the same transformation to these inputs and return a JSON array of exactly ${inputs.length} strings:\n${inBlock}`;
+
+  try {
+    const raw = await runPrompt(user, withSystem(settings, system), deps);
+    const arr = parseStringArray(raw);
+    if (arr && arr.length === inputs.length) return arr.map((v) => v.trim());
+  } catch {
+    /* fall through to per-input */
+  }
+  return Promise.all(inputs.map((t) => fillOne(ex, t, settings, deps).catch((e) => "Error: " + errMsg(e))));
+}
+
+async function fillOne(
+  examples: Array<{ input: string; output: string }>,
+  input: string,
+  settings: LlmSettings,
+  deps: Deps
+): Promise<string> {
+  const system =
+    "Infer the transformation from the examples and output ONLY the result for the " +
+    "new input — plain text, no labels or quotes.";
+  const exBlock = examples.map((e) => `IN: ${e.input}  =>  OUT: ${e.output}`).join("\n");
+  const out = await runPrompt(`${exBlock}\nIN: ${input}  =>  OUT:`, withSystem(settings, system), deps);
+  return out.trim();
+}
+
 /**
  * Ask the model for a list and return it as items. Prefers a JSON array; falls
  * back to splitting lines and stripping bullet/number prefixes.
@@ -289,6 +382,25 @@ function parseStringArray(raw: string): string[] | null {
   const parsed = tolerantJsonArray(s.slice(start, end + 1));
   if (!Array.isArray(parsed)) return null;
   return parsed.map((v) => (v == null ? "" : typeof v === "string" ? v : JSON.stringify(v)));
+}
+
+/** Parse a JSON 2D array (rows of cells) from possibly-fenced output; null if none. */
+function parseGrid(raw: string): string[][] | null {
+  let s = raw.trim();
+  const fence = s.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (fence) s = fence[1].trim();
+  const start = s.indexOf("[");
+  const end = s.lastIndexOf("]");
+  if (start === -1 || end <= start) return null;
+  const parsed = tolerantJsonArray(s.slice(start, end + 1));
+  if (!Array.isArray(parsed) || parsed.length === 0) return null;
+  const cell = (v: any) =>
+    v == null ? "" : typeof v === "string" ? v : typeof v === "object" ? JSON.stringify(v) : String(v);
+  // Rows-of-arrays, or a flat array we treat as a single column.
+  if (Array.isArray((parsed as any[])[0])) {
+    return (parsed as any[]).map((row) => (Array.isArray(row) ? row.map(cell) : [cell(row)]));
+  }
+  return (parsed as any[]).map((v) => [cell(v)]);
 }
 
 // Small/local models frequently emit *almost*-JSON arrays. Strict JSON.parse is

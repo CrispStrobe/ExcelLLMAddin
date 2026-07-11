@@ -17,6 +17,10 @@ import {
   extractFields,
   ask,
   similarity,
+  tagText,
+  editText,
+  generateTable,
+  fillByExample,
 } from "../core/tasks";
 import { loadSettings } from "../core/config";
 import { resilientFetch as fetchLike } from "../browserFetch";
@@ -160,6 +164,72 @@ export async function summarizeFn(text: string, maxWords?: number): Promise<stri
 export async function mapFn(range: string[][], instruction: string): Promise<string[][]> {
   try {
     return await mapRange(range, instruction, await currentSettings(), deps);
+  } catch (e) {
+    return [[errorText(e)]];
+  }
+}
+
+/**
+ * Applies all matching labels from a set (multi-label tagging).
+ * @customfunction TAG
+ * @param text The text to tag (or a cell reference).
+ * @param categories A range or list of candidate labels.
+ * @returns The matching labels, comma-separated.
+ */
+export async function tagFn(text: string, categories: string[][]): Promise<string> {
+  try {
+    return await tagText(text, flatten(categories), await currentSettings(), deps);
+  } catch (e) {
+    return errorText(e);
+  }
+}
+
+/**
+ * Rewrites or edits text; without an instruction, fixes spelling and grammar.
+ * @customfunction EDIT
+ * @param text The text to edit (or a cell reference).
+ * @param instruction Optional edit, e.g. "make it more formal".
+ * @returns The revised text.
+ */
+export async function editFn(text: string, instruction?: string): Promise<string> {
+  try {
+    return await editText(text, instruction, await currentSettings(), deps);
+  } catch (e) {
+    return errorText(e);
+  }
+}
+
+/**
+ * Generates a table of data from a prompt and spills it as a grid (first row = headers).
+ * @customfunction TABLE
+ * @param prompt What table to generate, e.g. "the 5 largest EU countries with population".
+ * @returns A 2D range of cells.
+ */
+export async function tableFn(prompt: string): Promise<string[][]> {
+  try {
+    return await generateTable(prompt, await currentSettings(), deps);
+  } catch (e) {
+    return [[errorText(e)]];
+  }
+}
+
+/**
+ * Infers a pattern from example input/output pairs and applies it to new inputs.
+ * @customfunction FILL
+ * @param examples A two-column range of example (input, output) pairs.
+ * @param inputs A range of new inputs to transform.
+ * @returns The inferred outputs, aligned to the inputs.
+ */
+export async function fillFn(examples: string[][], inputs: string[][]): Promise<string[][]> {
+  try {
+    const pairs = (examples || [])
+      .map((r) => ({ input: String(r?.[0] ?? ""), output: String(r?.[1] ?? "") }))
+      .filter((p) => p.input.trim() !== "" && p.output.trim() !== "");
+    const flat: string[] = [];
+    for (const row of inputs || []) for (const c of row || []) flat.push(String(c ?? ""));
+    const results = await fillByExample(pairs, flat, await currentSettings(), deps);
+    let k = 0;
+    return (inputs || []).map((row) => (row || []).map(() => results[k++] ?? ""));
   } catch (e) {
     return [[errorText(e)]];
   }

@@ -11,6 +11,10 @@ import {
   ask,
   similarity,
   cosine,
+  tagText,
+  editText,
+  generateTable,
+  fillByExample,
 } from "../tasks";
 import { LlmSettings, Deps, FetchLike } from "../llm";
 
@@ -145,6 +149,85 @@ describe("extractFields / ask", () => {
     const body = JSON.parse(calls[0].init.body).messages[1].content;
     expect(body).toContain("there are 42 apples");
     expect(body).toContain("how many apples?");
+  });
+});
+
+describe("tagText", () => {
+  test("returns only the recognized labels, order-preserving", async () => {
+    const { deps } = mockFetch("This is about Billing and Feature requests");
+    const out = await tagText("...", ["Bug", "Billing", "Feature"], settings, deps);
+    expect(out).toBe("Billing, Feature");
+  });
+
+  test("returns empty when the model matches nothing valid", async () => {
+    const { deps } = mockFetch("none of the above");
+    expect(await tagText("x", ["Bug", "Billing"], settings, deps)).toBe("");
+  });
+
+  test("errors with no categories", async () => {
+    const { deps } = mockFetch("x");
+    expect(await tagText("x", [], settings, deps)).toMatch(/no categories/);
+  });
+});
+
+describe("editText", () => {
+  test("returns the revised text trimmed", async () => {
+    const { deps, calls } = mockFetch("  Their house is nice.  ");
+    expect(await editText("they're house is nice", undefined, settings, deps)).toBe("Their house is nice.");
+    expect(JSON.parse(calls[0].init.body).messages[1].content).toMatch(/Fix spelling and grammar/);
+  });
+
+  test("passes a custom instruction into the system prompt", async () => {
+    const { deps, calls } = mockFetch("HELLO");
+    await editText("hello", "make it uppercase", settings, deps);
+    expect(JSON.parse(calls[0].init.body).messages[1].content).toMatch(/make it uppercase/);
+  });
+});
+
+describe("generateTable", () => {
+  test("parses a JSON array-of-arrays into a grid", async () => {
+    const { deps } = mockFetch(`[["Country","Pop"],["France","68"],["Spain","48"]]`);
+    const grid = await generateTable("EU countries", settings, deps);
+    expect(grid).toEqual([["Country", "Pop"], ["France", "68"], ["Spain", "48"]]);
+  });
+
+  test("treats a flat array as a single column", async () => {
+    const { deps } = mockFetch(`["a","b","c"]`);
+    expect(await generateTable("x", settings, deps)).toEqual([["a"], ["b"], ["c"]]);
+  });
+
+  test("reports a parse error instead of throwing", async () => {
+    const { deps } = mockFetch("sorry, no table here");
+    expect((await generateTable("x", settings, deps))[0][0]).toMatch(/could not parse/);
+  });
+});
+
+describe("fillByExample", () => {
+  test("batches examples + inputs and returns aligned outputs", async () => {
+    const { deps, calls } = mockFetch(`["FR","ES"]`);
+    const out = await fillByExample(
+      [{ input: "Germany", output: "DE" }],
+      ["France", "Spain"],
+      settings,
+      deps
+    );
+    expect(out).toEqual(["FR", "ES"]);
+    const body = JSON.parse(calls[0].init.body).messages[1].content;
+    expect(body).toMatch(/Germany.*=>.*DE/);
+  });
+
+  test("errors on every input when no example pairs are given", async () => {
+    const { deps, calls } = mockFetch(`["x"]`);
+    const out = await fillByExample([], ["a", "b"], settings, deps);
+    expect(out).toEqual(["Error: need at least one example (input, output) pair", "Error: need at least one example (input, output) pair"]);
+    expect(calls.length).toBe(0);
+  });
+
+  test("falls back to per-input when the batch reply is malformed", async () => {
+    const { deps, calls } = mockFetch("R"); // not a JSON array
+    const out = await fillByExample([{ input: "a", output: "A" }], ["x", "y"], settings, deps);
+    expect(out).toEqual(["R", "R"]);
+    expect(calls.length).toBe(3); // 1 batch + 2 per-input
   });
 });
 
