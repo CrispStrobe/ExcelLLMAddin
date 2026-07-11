@@ -346,8 +346,17 @@ Public Function ParseJsonStringArray(raw As String) As Collection
     en = InStrRev(s, "]")
     If st = 0 Or en <= st Then Set ParseJsonStringArray = Nothing: Exit Function
 
+    Dim sliced As String
+    sliced = Mid(s, st, en - st + 1)
+
+    ' Small/local models often emit a trailing comma before ]; VBA-JSON rejects it.
+    ' Try strict first, then a portable trailing-comma repair (no VBScript.RegExp,
+    ' which is absent on Mac Excel). On failure the callers take their own reliable
+    ' fallback, so a failed repair is never worse than the un-repaired behavior.
     Dim arr As Object
-    Set arr = JsonConverter.ParseJson(Mid(s, st, en - st + 1))
+    Set arr = TryParseJsonArray(sliced)
+    If arr Is Nothing Then Set arr = TryParseJsonArray(StripTrailingComma(sliced))
+    If arr Is Nothing Then Set ParseJsonStringArray = Nothing: Exit Function
 
     Dim c As New Collection, i As Long
     For i = 1 To arr.Count
@@ -357,6 +366,38 @@ Public Function ParseJsonStringArray(raw As String) As Collection
     Exit Function
 Fail:
     Set ParseJsonStringArray = Nothing
+End Function
+
+' Parse a JSON array, returning Nothing instead of raising on malformed input.
+Private Function TryParseJsonArray(ByVal s As String) As Object
+    On Error GoTo Fail
+    Set TryParseJsonArray = JsonConverter.ParseJson(s)
+    Exit Function
+Fail:
+    Set TryParseJsonArray = Nothing
+End Function
+
+' Remove a single trailing comma between the last element and the closing "]"
+' (e.g. ["a","b",] -> ["a","b"]). Only touches the comma right before "]", so it
+' cannot corrupt string contents. Pure VBA -- works on Mac and Windows.
+Private Function StripTrailingComma(ByVal s As String) As String
+    Dim rb As Long
+    rb = InStrRev(s, "]")
+    If rb = 0 Then StripTrailingComma = s: Exit Function
+
+    Dim i As Long, ch As String
+    For i = rb - 1 To 1 Step -1
+        ch = Mid(s, i, 1)
+        If ch = " " Or ch = vbTab Or ch = vbCr Or ch = vbLf Then
+            ' skip whitespace between the comma and "]"
+        ElseIf ch = "," Then
+            s = Left(s, i - 1) & Mid(s, i + 1)
+            Exit For
+        Else
+            Exit For   ' last real char isn't a comma; nothing to strip
+        End If
+    Next i
+    StripTrailingComma = s
 End Function
 
 ' Fallback list parsing: split lines, strip bullet/number prefixes.

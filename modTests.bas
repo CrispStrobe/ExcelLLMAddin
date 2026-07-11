@@ -71,6 +71,7 @@ Public Function RunAllTests(Optional ByVal showUI As Boolean = True) As Long
     Test_Task_Extract
     Test_Task_List
     Test_Task_Fields
+    Test_Task_TolerantArray
     Test_Task_Cosine
     Test_Task_Embed
 
@@ -342,6 +343,28 @@ Private Sub Test_Task_Fields()
     r = FIELDS("Bob bob@x.com", "name,email", "ollama", "test-model")
     AssertEqual "task/fields name", "Bob", CStr(r(1, 1))
     AssertEqual "task/fields email", "bob@x.com", CStr(r(1, 2))
+End Sub
+
+Private Sub Test_Task_TolerantArray()
+    ' Strict JSON still parses.
+    Dim c As Collection
+    Set c = ParseJsonStringArray("[""x"",""y""]")
+    AssertTrue "task/tolerant strict not nothing", Not (c Is Nothing)
+    AssertEqual "task/tolerant strict count", "2", CStr(c.Count)
+
+    ' A trailing comma (common from small models) is repaired, not rejected.
+    Dim t As Collection
+    Set t = ParseJsonStringArray("[""a"",""b"",]")
+    AssertTrue "task/tolerant trailing-comma not nothing", Not (t Is Nothing)
+    AssertEqual "task/tolerant trailing-comma count", "2", CStr(t.Count)
+    AssertEqual "task/tolerant trailing-comma first", "a", CStr(t(1))
+    AssertEqual "task/tolerant trailing-comma second", "b", CStr(t(2))
+
+    ' Trailing comma with whitespace before the bracket, too.
+    Dim w As Collection
+    Set w = ParseJsonStringArray("[""a"", ""b"" , ]")
+    AssertTrue "task/tolerant ws-comma not nothing", Not (w Is Nothing)
+    AssertEqual "task/tolerant ws-comma count", "2", CStr(w.Count)
 End Sub
 
 Private Sub Test_Task_Cosine()
