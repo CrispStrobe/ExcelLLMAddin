@@ -172,6 +172,7 @@ Public Sub ShowSettings()
         providers & vbCrLf & vbCrLf & _
         "Choose action:" & vbCrLf & _
         "1-6: Configure provider" & vbCrLf & _
+        "C: Other cloud (Groq, Gemini, Cohere, HF, ...)" & vbCrLf & _
         "7: Set default model" & vbCrLf & _
         "8: Show current config" & vbCrLf & _
         "9: Test connection" & vbCrLf & _
@@ -231,7 +232,11 @@ Public Sub ShowSettings()
         Case "D"
             Call FullDiagnostic
             Call ShowSettings
-            
+
+        Case "C"
+            Call ConfigureExtraProvider
+            Call ShowSettings
+
         Case "0"
             ' Exit
             Exit Sub
@@ -406,6 +411,50 @@ Private Sub ConfigureProvider(providerKey As String, providerName As String)
     
 ErrorHandler:
     If DEBUG_MODE Then Debug.Print "[ConfigureProvider] ERROR: " & Err.Description
+    MsgBox "Error: " & Err.Description, vbCritical
+End Sub
+
+' Configure one of the extra OpenAI-compatible cloud providers. Their base URLs
+' are fixed (GetBaseURL), and the key is stored generically in ProviderKeys, so a
+' single flow covers all of them without a per-provider variable or menu entry.
+Private Sub ConfigureExtraProvider()
+    On Error GoTo ErrorHandler
+
+    Dim providerKey As String, apiKey As String, model As String, resp As Integer
+
+    providerKey = LCase(Trim(InputBox( _
+        "Cloud provider id:" & vbCrLf & vbCrLf & _
+        "groq, together, cerebras, gemini, cohere, huggingface, requesty" & vbCrLf & vbCrLf & _
+        "(all OpenAI-compatible; enter your key next)", _
+        "Cloud Provider", "groq")))
+    If providerKey = "" Then Exit Sub
+
+    If GetBaseURL(providerKey) = "" Then
+        MsgBox "Unknown provider '" & providerKey & "'." & vbCrLf & _
+               "Supported: groq, together, cerebras, gemini, cohere, huggingface, requesty.", _
+               vbExclamation
+        Exit Sub
+    End If
+
+    apiKey = InputBox("API key for " & providerKey & ":", "API Key")
+    If apiKey <> "" Then Call SetProviderKey(providerKey, apiKey)
+
+    model = InputBox("Default model for " & providerKey & ":" & vbCrLf & _
+                     "(e.g. llama-3.3-70b-versatile for groq, gemini-2.0-flash for gemini)", _
+                     providerKey & " Model")
+
+    resp = MsgBox("Set " & providerKey & " as the default provider?", vbYesNo + vbQuestion, "Set Default?")
+    If resp = vbYes Then
+        CurrentProvider = providerKey
+        If model <> "" Then CurrentModel = model
+    End If
+
+    Call SaveConfig
+    MsgBox providerKey & " configured." & vbCrLf & "Base URL: " & GetBaseURL(providerKey), vbInformation
+    Exit Sub
+
+ErrorHandler:
+    If DEBUG_MODE Then Debug.Print "[ConfigureExtraProvider] ERROR: " & Err.Description
     MsgBox "Error: " & Err.Description, vbCritical
 End Sub
 

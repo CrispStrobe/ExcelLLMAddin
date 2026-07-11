@@ -21,6 +21,23 @@ Public OLLAMA_BASE_URL As String
 Public CurrentProvider As String
 Public CurrentModel As String
 
+' Keys for the extra OpenAI-compatible cloud providers (groq, together, cerebras,
+' gemini, cohere, huggingface, requesty). Kept in one cross-platform Dictionary
+' (vendored, works on Mac + Windows) instead of a fixed variable per provider, and
+' persisted as PKEY_<provider>= lines. Their base URLs are fixed literals in
+' GetBaseURL, so no per-provider URL variable is needed.
+Public ProviderKeys As Dictionary
+
+Private Sub EnsureProviderKeys()
+    If ProviderKeys Is Nothing Then Set ProviderKeys = New Dictionary
+End Sub
+
+' Public setter so the menu (modMenu) can store a cloud provider's key.
+Public Sub SetProviderKey(ByVal provider As String, ByVal key As String)
+    EnsureProviderKeys
+    ProviderKeys(LCase(Trim(provider))) = key
+End Sub
+
 ' Get config file location
 Public Function GetConfigLocation() As String
     Dim paths() As String
@@ -137,6 +154,12 @@ Public Sub LoadConfig()
                                 If DEBUG_MODE Then Debug.Print "[Config]   *** SET OLLAMA_BASE_URL = '" & value & "'"
                             Case "CurrentProvider": CurrentProvider = value
                             Case "CurrentModel": CurrentModel = value
+                            Case Else
+                                ' Extra cloud-provider keys: PKEY_<provider>=...
+                                If Left(key, 5) = "PKEY_" Then
+                                    EnsureProviderKeys
+                                    ProviderKeys(LCase(Mid(key, 6))) = value
+                                End If
                         End Select
                     Else
                         If DEBUG_MODE Then Debug.Print "[Config] Line " & lineNum & ": " & key & " = (empty, keeping default)"
@@ -188,6 +211,14 @@ Public Sub SaveConfig()
     Print #fileNum, "NEBIUS_API_KEY=" & NEBIUS_API_KEY
     Print #fileNum, "SCALEWAY_API_KEY=" & SCALEWAY_API_KEY
     Print #fileNum, "OPENROUTER_API_KEY=" & OPENROUTER_API_KEY
+
+    ' Extra cloud-provider keys (groq, gemini, ...), one PKEY_ line each.
+    EnsureProviderKeys
+    Dim pk As Variant
+    For Each pk In ProviderKeys.Keys
+        Print #fileNum, "PKEY_" & pk & "=" & ProviderKeys(pk)
+    Next pk
+
     Print #fileNum, ""
     Print #fileNum, "# Provider URLs"
     Print #fileNum, "OPENAI_URL=" & OPENAI_URL
@@ -227,7 +258,9 @@ Public Sub InitializeDefaults()
     ' Provider/Model - only if empty
     If CurrentProvider = "" Then CurrentProvider = "ollama"
     If CurrentModel = "" Then CurrentModel = "ministral-3:3b-instruct-2512-q4_K_M"
-    
+
+    EnsureProviderKeys
+
     If DEBUG_MODE Then Debug.Print "[Config] Defaults complete"
 End Sub
 
@@ -240,7 +273,14 @@ Public Function GetAPIKey(provider As String) As String
         Case "scaleway": GetAPIKey = SCALEWAY_API_KEY
         Case "openrouter": GetAPIKey = OPENROUTER_API_KEY
         Case "ollama": GetAPIKey = ""
-        Case Else: GetAPIKey = ""
+        Case Else
+            ' Extra cloud providers keep their key in ProviderKeys.
+            EnsureProviderKeys
+            If ProviderKeys.Exists(LCase(Trim(provider))) Then
+                GetAPIKey = ProviderKeys(LCase(Trim(provider)))
+            Else
+                GetAPIKey = ""
+            End If
     End Select
 End Function
 
@@ -258,6 +298,14 @@ Public Function GetBaseURL(provider As String) As String
         Case "scaleway": GetBaseURL = SCALEWAY_URL
         Case "openrouter": GetBaseURL = OPENROUTER_URL
         Case "ollama": GetBaseURL = OLLAMA_BASE_URL
+        ' Extra OpenAI-compatible cloud providers (fixed base URLs).
+        Case "groq": GetBaseURL = "https://api.groq.com/openai/v1"
+        Case "together": GetBaseURL = "https://api.together.xyz/v1"
+        Case "cerebras": GetBaseURL = "https://api.cerebras.ai/v1"
+        Case "gemini": GetBaseURL = "https://generativelanguage.googleapis.com/v1beta/openai"
+        Case "cohere": GetBaseURL = "https://api.cohere.ai/compatibility/v1"
+        Case "huggingface": GetBaseURL = "https://router.huggingface.co/v1"
+        Case "requesty": GetBaseURL = "https://router.requesty.ai/v1"
         Case Else: GetBaseURL = ""
     End Select
 End Function

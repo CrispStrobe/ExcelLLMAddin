@@ -98,6 +98,10 @@ no hosting, no web server. It has near-parity with the Office.js edition:
   fully air-gapped AI that edits your workbook.
 - **MCP** (`modMcp.bas`) — run `SetMcpServer` to add a remote MCP server's tools
   to the agent (best-effort JSON-RPC over HTTP; targets stateless servers).
+- Providers: the same catalog as the Office.js edition — OpenAI, Mistral, Nebius,
+  Scaleway, OpenRouter, Groq, Together, Cerebras, Gemini, Cohere, Hugging Face,
+  Requesty, and local Ollama. Configure the added cloud ones via the settings
+  menu's **C** option (they share one OpenAI-compatible code path).
 - Solid plumbing: injected `IHttpClient` (WinHTTP/curl), real JSON (vendored
   VBA-JSON), UTF-8, a response cache, and a `RunAllTests` self-test harness.
 - Only unported feature: `STREAM` (VBA UDFs are synchronous — no live cell updates).
