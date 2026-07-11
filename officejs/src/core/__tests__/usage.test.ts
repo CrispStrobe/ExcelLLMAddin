@@ -21,6 +21,10 @@ describe("parseUsage", () => {
     expect(parseUsage(`{"message":{"content":"hi"}}`, "ollama")).toBeNull();
     expect(parseUsage("not json", "openai")).toBeNull();
   });
+
+  test("treats an all-zero usage object as none", () => {
+    expect(parseUsage(`{"usage":{"prompt_tokens":0,"completion_tokens":0,"total_tokens":0}}`, "openai")).toBeNull();
+  });
 });
 
 describe("usageTracker", () => {

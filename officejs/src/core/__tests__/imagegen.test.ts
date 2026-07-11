@@ -62,6 +62,17 @@ describe("generateImage (BFL direct)", () => {
     await expect(generateImage("x", bfl, deps)).rejects.toThrow("invalid key");
   });
 
+  test("surfaces an {error:string} submit body", async () => {
+    const { deps } = scripted([{ ok: false, status: 400, body: { error: "bad model" } }]);
+    await expect(generateImage("x", bfl, deps)).rejects.toThrow("bad model");
+  });
+
+  test("falls back to the status code on an unparseable submit body", async () => {
+    // A non-JSON error body: bflError returns undefined -> HTTP N message.
+    const fetch: FetchLike = async () => ({ ok: false, status: 502, text: async () => "<html>bad gateway</html>" });
+    await expect(generateImage("x", bfl, { fetch, ...instant })).rejects.toThrow(/HTTP 502/);
+  });
+
   test("requires an api key when not using a proxy", async () => {
     const { deps, calls } = scripted([{ body: {} }]);
     await expect(generateImage("x", { model: "flux-dev" }, deps)).rejects.toThrow(/BFL API key/);

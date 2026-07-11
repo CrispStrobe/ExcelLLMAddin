@@ -151,6 +151,17 @@ describe("chatWithTools", () => {
     expect(body.tool_choice).toBe("auto");
   });
 
+  test("reports token usage via onUsage", async () => {
+    const body = JSON.stringify({
+      choices: [{ message: { role: "assistant", content: "done" } }],
+      usage: { prompt_tokens: 20, completion_tokens: 8, total_tokens: 28 },
+    });
+    const { deps } = queueMock([body]);
+    const seen: any[] = [];
+    await chatWithTools([{ role: "user", content: "x" }], TOOLS, settings, { ...deps, onUsage: (u) => seen.push(u) });
+    expect(seen).toEqual([{ promptTokens: 20, completionTokens: 8, totalTokens: 28 }]);
+  });
+
   test("throws before fetching when a required key is missing", async () => {
     const { deps, calls } = queueMock([finalResponse("unused")]);
     await expect(
