@@ -20,7 +20,14 @@ temp files, and none of the encoding pain of the legacy `.xlam`.
 - `=LLM.TRANSLATE(text, language)` — translate a cell
 - `=LLM.SUMMARIZE(text, [maxWords])` — summarize a cell
 - `=LLM.SENTIMENT(text)` — Positive / Neutral / Negative
+- `=LLM.TAG(text, categories)` — multi-label: all labels that apply
 - `=LLM.LIST(prompt, [count])` — generate a list, spilled down a column
+- `=LLM.TABLE(prompt)` — generate a 2D table, spilled as a grid
+- `=LLM.FILL(examples, inputs)` — infer a pattern from example (input,output) pairs and apply it
+- `=LLM.EDIT(text, [instruction])` — rewrite / fix grammar
+- `=LLM.FORMULA(description)` — write an Excel formula from plain English
+- `=LLM.EXPLAIN(formula)` — explain a formula (pair with `FORMULATEXT(A1)`)
+- `=LLM.VISION(image, [question])` — ask about an image (URL or data: URI; vision model)
 - `=LLM.FIELDS(text, fields)` — extract fields into a spilled row (text → table)
 - `=LLM.ASK(question, context)` — answer a question using a range as context
 - `=LLM.SIMILARITY(a, b, [model])` — semantic similarity (0..1) via embeddings

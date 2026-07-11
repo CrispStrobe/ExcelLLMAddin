@@ -84,11 +84,12 @@ The hosted, validated manifest to submit is
 - **Description (long):**
 
   > Bring large language models into Excel. Use simple worksheet functions —
-  > =LLM.PROMPT, CLASSIFY, EXTRACT, FIELDS, TRANSLATE, SUMMARIZE, SENTIMENT,
-  > LIST, ASK, SIMILARITY, MAP, and a live-streaming STREAM — to run AI over your
-  > data right in the grid. A built-in agent goes further: describe a change in
-  > plain English and it reads and edits your workbook (ranges, formulas,
-  > formatting, sheets) via tool-calling, with approve-before-apply safety.
+  > =LLM.PROMPT, CLASSIFY, TAG, EXTRACT, FIELDS, TRANSLATE, SUMMARIZE, SENTIMENT,
+  > LIST, TABLE, FILL, EDIT, FORMULA, EXPLAIN, VISION, ASK, SIMILARITY, MAP, and a
+  > live-streaming STREAM — to run AI over your data right in the grid. A built-in
+  > agent goes further: describe a change in plain English and it reads and edits
+  > your workbook (ranges, formulas, formatting, sheets, charts) via tool-calling,
+  > with approve-before-apply safety.
   >
   > Bring your own provider: OpenAI, Mistral, Nebius, Scaleway, OpenRouter, or a
   > local Ollama server. Your API keys stay on your device (or on your own

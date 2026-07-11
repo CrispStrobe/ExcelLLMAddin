@@ -33,7 +33,14 @@ Worksheet functions (namespace `LLM`):
 | `=LLM.TRANSLATE(text, language)` | Translate a cell |
 | `=LLM.SUMMARIZE(text, [maxWords])` | Summarize a cell |
 | `=LLM.SENTIMENT(text)` | Positive / Neutral / Negative |
+| `=LLM.TAG(text, categories)` | Multi-label: all labels that apply |
 | `=LLM.LIST(prompt, [count])` | Generate a list, spilled down a column |
+| `=LLM.TABLE(prompt)` | Generate a 2D table, spilled as a grid |
+| `=LLM.FILL(examples, inputs)` | Infer a pattern from example pairs, apply down a column |
+| `=LLM.EDIT(text, [instruction])` | Rewrite / fix grammar |
+| `=LLM.FORMULA(description)` | Write an Excel formula from plain English |
+| `=LLM.EXPLAIN(formula)` | Explain a formula (pair with `FORMULATEXT`) |
+| `=LLM.VISION(image, [question])` | Ask about an image (URL or data URI) |
 | `=LLM.ASK(question, context)` | Answer a question using a range as context |
 | `=LLM.SIMILARITY(a, b, [model])` | Semantic similarity (0–1) via embeddings |
 | `=LLM.MAP(range, instruction)` | Apply an instruction to every cell (batched) |
@@ -74,6 +81,11 @@ without the `LLM.` prefix, e.g. `=CLASSIFY(...)`):
 | Semantic match against a reference | `=LLM.SIMILARITY(A2, $B$1)` |
 | Answer from a range of context | `=LLM.ASK("what's the refund policy?", D2:D50)` |
 | Generate a list down a column | `=LLM.LIST("EU capital cities", 10)` |
+| Generate a whole table | `=LLM.TABLE("5 largest EU countries with population")` |
+| Fill by example (learn from 2-3 rows) | `=LLM.FILL(A2:B4, C2:C100)` |
+| Write a formula from words | `=LLM.FORMULA("sum col B where A > 100")` |
+| Explain a formula | `=LLM.EXPLAIN(FORMULATEXT(D2))` |
+| Ask about an image | `=LLM.VISION("https://…/chart.png", "what's the trend?")` |
 
 Agent (task pane, plain English): *"In D1 put the sum of B2:B10, then bold anything
 over 100"* · *"add a column classifying each row of my selection as high/low"*.
