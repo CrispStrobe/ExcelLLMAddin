@@ -76,9 +76,11 @@ no hosting, no web server. It has near-parity with the Office.js edition:
 - **Agent** (`modAgent.bas`) — run the `RunAgent` macro; the model edits the sheet
   via native `Range` tools with approve-before-apply. With local Ollama, this is a
   fully air-gapped AI that edits your workbook.
+- **MCP** (`modMcp.bas`) — run `SetMcpServer` to add a remote MCP server's tools
+  to the agent (best-effort JSON-RPC over HTTP; targets stateless servers).
 - Solid plumbing: injected `IHttpClient` (WinHTTP/curl), real JSON (vendored
   VBA-JSON), UTF-8, a response cache, and a `RunAllTests` self-test harness.
-- Not ported: `STREAM` (VBA UDFs are synchronous) and the MCP client.
+- Only unported feature: `STREAM` (VBA UDFs are synchronous — no live cell updates).
 
 **Build:** `pwsh tools/Build-Addin.ps1` on Windows+Excel, or import the modules in
 the VBA editor and Save As `.xlam` (Excel is required to compile VBA — it can't be
