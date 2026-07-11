@@ -19,7 +19,7 @@ import {
   similarity,
 } from "../core/tasks";
 import { loadSettings } from "../core/config";
-import { browserFetch as fetchLike } from "../browserFetch";
+import { resilientFetch as fetchLike } from "../browserFetch";
 import { createLruCache } from "../core/cache";
 import { streamChat } from "../stream";
 

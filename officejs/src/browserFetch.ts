@@ -4,6 +4,7 @@
 // instead of failing fast.
 
 import { FetchLike } from "./core/llm";
+import { withRetry } from "./core/retry";
 
 /* global fetch, AbortController, setTimeout, clearTimeout, RequestInit */
 
@@ -24,3 +25,8 @@ export const browserFetch: FetchLike = async (url, init) => {
     clearTimeout(timer);
   }
 };
+
+// What callers should use: the timeout-bounded fetch above, wrapped so transient
+// rate-limits (429) and 5xx/network blips retry with backoff instead of failing a
+// cell. A per-request timeout still bounds each individual attempt.
+export const resilientFetch: FetchLike = withRetry(browserFetch);

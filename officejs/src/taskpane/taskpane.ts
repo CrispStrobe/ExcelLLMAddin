@@ -5,7 +5,7 @@ import { runPrompt, listModels, LlmSettings } from "../core/llm";
 import { runAgent, createApprovalExecutor, PendingAction, ToolExecutor } from "../core/agent";
 import { EXCEL_TOOLS, executeExcelTool, WRITE_TOOLS } from "../excelTools";
 import { connectMcp, browserMcpFetch } from "../mcp";
-import { browserFetch as fetchLike } from "../browserFetch";
+import { resilientFetch as fetchLike } from "../browserFetch";
 
 /* global Office, document, window */
 
