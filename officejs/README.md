@@ -28,6 +28,7 @@ temp files, and none of the encoding pain of the legacy `.xlam`.
 - `=LLM.FORMULA(description)` — write an Excel formula from plain English
 - `=LLM.EXPLAIN(formula)` — explain a formula (pair with `FORMULATEXT(A1)`)
 - `=LLM.VISION(image, [question])` — ask about an image (URL or data: URI; vision model)
+- `=LLM.IMAGE(prompt, [width], [height])` — generate an image (FLUX/BFL); wrap in `=IMAGE()` to display
 - `=LLM.FIELDS(text, fields)` — extract fields into a spilled row (text → table)
 - `=LLM.ASK(question, context)` — answer a question using a range as context
 - `=LLM.SIMILARITY(a, b, [model])` — semantic similarity (0..1) via embeddings
@@ -127,7 +128,7 @@ LIVE_PROVIDERS=1 GROQ_API_KEY=… OPENROUTER_API_KEY=… npx jest live.providers
 ```
 
 Verified live via this suite: Groq, OpenRouter, Nebius, Mistral, Cohere, and
-Hugging Face (chat + model listing), plus Nebius embeddings.
+Hugging Face (chat + model listing), Nebius embeddings, and BFL image generation.
 
 Excel-only behaviour (custom-function registration, `=LLM.PROMPT` in a live cell)
 is checked separately — see `docs/MANUAL_TEST_CHECKLIST.md`.

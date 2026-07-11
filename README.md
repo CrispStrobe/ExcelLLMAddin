@@ -41,6 +41,7 @@ Worksheet functions (namespace `LLM`):
 | `=LLM.FORMULA(description)` | Write an Excel formula from plain English |
 | `=LLM.EXPLAIN(formula)` | Explain a formula (pair with `FORMULATEXT`) |
 | `=LLM.VISION(image, [question])` | Ask about an image (URL or data URI) |
+| `=LLM.IMAGE(prompt, [w], [h])` | Generate an image; wrap in `=IMAGE(...)` to show it |
 | `=LLM.ASK(question, context)` | Answer a question using a range as context |
 | `=LLM.SIMILARITY(a, b, [model])` | Semantic similarity (0–1) via embeddings |
 | `=LLM.RECALL(query, range, [k])` | Semantic search: top rows in a range by meaning |
@@ -87,6 +88,7 @@ without the `LLM.` prefix, e.g. `=CLASSIFY(...)`):
 | Write a formula from words | `=LLM.FORMULA("sum col B where A > 100")` |
 | Explain a formula | `=LLM.EXPLAIN(FORMULATEXT(D2))` |
 | Ask about an image | `=LLM.VISION("https://…/chart.png", "what's the trend?")` |
+| Generate an image into a cell | `=IMAGE(LLM.IMAGE("a red bicycle, studio photo"))` |
 
 Agent (task pane, plain English): *"In D1 put the sum of B2:B10, then bold anything
 over 100"* · *"add a column classifying each row of my selection as high/low"*.

@@ -36,6 +36,10 @@ export interface LlmSettings {
   embedModel?: string;
   /** Optional remote MCP server URL; its tools are added to the agent. */
   mcpUrl?: string;
+  /** Black Forest Labs API key for =IMAGE (direct calls; CORS may require the proxy). */
+  imageApiKey?: string;
+  /** BFL image model slug for =IMAGE, e.g. flux-dev. */
+  imageModel?: string;
 }
 
 export type FetchLike = (

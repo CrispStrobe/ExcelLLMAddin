@@ -16,6 +16,8 @@ export function defaultSettings(): LlmSettings {
     systemPrompt: "",
     embedModel: "",
     mcpUrl: "",
+    imageApiKey: "",
+    imageModel: "flux-dev",
   };
 }
 

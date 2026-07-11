@@ -61,6 +61,40 @@ export default {
       return json({ error: "Invalid JSON body" }, 400);
     }
 
+    // Image generation (Black Forest Labs / FLUX): submit then poll, server-side.
+    // Not OpenAI-compatible, so it's handled before the chat-provider lookup.
+    if (req.op === "image") {
+      const bflKey = env.BFL_API_KEY;
+      if (!bflKey) return json({ error: "Missing secret BFL_API_KEY" }, 500);
+      const model = req.model || "flux-dev";
+      try {
+        const sub = await fetch(`https://api.bfl.ai/v1/${model}`, {
+          method: "POST",
+          headers: { "x-key": bflKey, "Content-Type": "application/json" },
+          body: JSON.stringify({ prompt: String(req.prompt || ""), width: req.width || 1024, height: req.height || 768 }),
+        });
+        const subData = await sub.json();
+        if (!sub.ok) return json({ error: errMsg(subData.detail || subData.error || `HTTP ${sub.status}`) }, sub.status || 502);
+        const pollUrl = subData.polling_url;
+        if (!pollUrl) return json({ error: "No polling_url from BFL" }, 502);
+        for (let i = 0; i < 30; i++) {
+          await new Promise((r) => setTimeout(r, 1500));
+          const pr = await fetch(pollUrl, { headers: { "x-key": bflKey } });
+          const pd = await pr.json();
+          if (pd.status === "Ready") {
+            const url = pd.result && pd.result.sample;
+            return url ? json({ url }) : json({ error: "No image in BFL result" }, 502);
+          }
+          if (["Error", "Failed", "Content Moderated", "Request Moderated"].includes(pd.status)) {
+            return json({ error: "Image generation " + pd.status }, 502);
+          }
+        }
+        return json({ error: "Image generation timed out" }, 504);
+      } catch (e) {
+        return json({ error: e && e.message ? e.message : String(e) }, 502);
+      }
+    }
+
     const spec = PROVIDERS[String(req.provider || "").toLowerCase()];
     if (!spec) return json({ error: `Unknown provider '${req.provider}'` }, 400);
 

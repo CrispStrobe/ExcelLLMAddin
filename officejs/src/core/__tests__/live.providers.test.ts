@@ -11,6 +11,7 @@
 
 import { runPrompt, listModels, embed, FetchLike, LlmSettings } from "../llm";
 import { fillByExample, generateTable, tagText, editText, writeFormula, analyzeImage, recall } from "../tasks";
+import { generateImage } from "../imagegen";
 
 const LIVE = process.env.LIVE_PROVIDERS === "1";
 const suite = LIVE ? describe : describe.skip;
@@ -114,6 +115,20 @@ suite("LIVE providers", () => {
       const s: LlmSettings = { provider: "groq", model: "meta-llama/llama-4-scout-17b-16e-instruct", apiKey: key };
       const out = await analyzeImage(RED_PNG, "What color fills this image? One word.", s, deps);
       expect(out.toLowerCase()).toContain("red");
+    });
+  });
+
+  describe("image generation (via BFL)", () => {
+    const key = process.env.BFL_API_KEY;
+    const t = key ? test : test.skip;
+    t("generateImage returns a hosted image URL", async () => {
+      jest.setTimeout(60000);
+      const url = await generateImage(
+        "a plain red square",
+        { apiKey: key, model: "flux-dev", width: 256, height: 256, pollMs: 2000, maxPolls: 20 },
+        { fetch: nodeFetch }
+      );
+      expect(url).toMatch(/^https:\/\/.+/);
     });
   });
 

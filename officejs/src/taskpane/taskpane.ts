@@ -138,6 +138,7 @@ function setForm(s: LlmSettings): void {
   byId<HTMLInputElement>("proxyUrl").value = s.proxyUrl || "";
   byId<HTMLInputElement>("embedModel").value = s.embedModel || "";
   byId<HTMLInputElement>("mcpUrl").value = s.mcpUrl || "";
+  byId<HTMLInputElement>("imageApiKey").value = s.imageApiKey || "";
   byId<HTMLTextAreaElement>("systemPrompt").value = s.systemPrompt || "";
 }
 
@@ -150,6 +151,7 @@ function readForm(): LlmSettings {
     proxyUrl: byId<HTMLInputElement>("proxyUrl").value.trim(),
     embedModel: byId<HTMLInputElement>("embedModel").value.trim(),
     mcpUrl: byId<HTMLInputElement>("mcpUrl").value.trim(),
+    imageApiKey: byId<HTMLInputElement>("imageApiKey").value.trim(),
     systemPrompt: byId<HTMLTextAreaElement>("systemPrompt").value.trim(),
   };
 }

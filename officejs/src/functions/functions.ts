@@ -30,6 +30,7 @@ import { loadSettings } from "../core/config";
 import { resilientFetch as fetchLike } from "../browserFetch";
 import { createLruCache } from "../core/cache";
 import { streamChat } from "../stream";
+import { generateImage } from "../core/imagegen";
 
 /* global CustomFunctions */
 
@@ -310,6 +311,28 @@ export async function recallFn(
     return results.length ? results.map(([t, sc]) => [t, String(sc)]) : [["(no matches)", ""]];
   } catch (e) {
     return [[errorText(e)]];
+  }
+}
+
+/**
+ * Generates an image from a prompt and returns its URL. Show it with Excel's
+ * IMAGE(): =IMAGE(LLM.IMAGE("a red bicycle")). Needs a BFL key or the proxy.
+ * @customfunction IMAGE
+ * @param prompt What to draw.
+ * @param width Optional width in px (default 1024).
+ * @param height Optional height in px (default 768).
+ * @returns The generated image URL.
+ */
+export async function imageFn(prompt: string, width?: number, height?: number): Promise<string> {
+  try {
+    const s = await currentSettings();
+    return await generateImage(
+      prompt,
+      { apiKey: s.imageApiKey, model: s.imageModel, proxyUrl: s.proxyUrl, width, height },
+      { fetch: fetchLike }
+    );
+  } catch (e) {
+    return errorText(e);
   }
 }
 
