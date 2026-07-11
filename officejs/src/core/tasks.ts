@@ -176,6 +176,46 @@ async function fillOne(
   return out.trim();
 }
 
+/** Write an Excel formula from a natural-language description. Returns "=…". */
+export async function writeFormula(
+  description: string,
+  settings: LlmSettings,
+  deps: Deps
+): Promise<string> {
+  const system =
+    "You write Microsoft Excel formulas. Output ONLY a single Excel formula that " +
+    "starts with '=' — no explanation, no code fences, no surrounding text. Prefer " +
+    "standard, widely-supported functions.";
+  const out = await runPrompt(`Write an Excel formula that: ${description}`, withSystem(settings, system), deps);
+  return cleanFormula(out);
+}
+
+/** Explain what an Excel formula does, in plain English. */
+export async function explainFormula(
+  formula: string,
+  settings: LlmSettings,
+  deps: Deps
+): Promise<string> {
+  const system =
+    "Explain what the given Excel formula does, in plain English and concisely " +
+    "(2-3 sentences max). Output only the explanation.";
+  const out = await runPrompt(`Explain this Excel formula:\n${formula}`, withSystem(settings, system), deps);
+  return out.trim();
+}
+
+/** Pull a clean "=…" formula out of a model reply (strip fences/prose). */
+function cleanFormula(raw: string): string {
+  let s = raw.trim();
+  const fence = s.match(/```(?:[a-z]*)?\s*([\s\S]*?)```/i);
+  if (fence) s = fence[1].trim();
+  s = s.replace(/^`+|`+$/g, "").trim();
+  const eq = s.indexOf("=");
+  if (eq >= 0) s = s.slice(eq); // drop any leading prose before the '='
+  s = s.split("\n")[0].trim(); // formula is a single line
+  if (s && !s.startsWith("=")) s = "=" + s;
+  return s;
+}
+
 /**
  * Ask the model for a list and return it as items. Prefers a JSON array; falls
  * back to splitting lines and stripping bullet/number prefixes.

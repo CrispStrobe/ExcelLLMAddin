@@ -21,6 +21,8 @@ import {
   editText,
   generateTable,
   fillByExample,
+  writeFormula,
+  explainFormula,
 } from "../core/tasks";
 import { loadSettings } from "../core/config";
 import { resilientFetch as fetchLike } from "../browserFetch";
@@ -232,6 +234,34 @@ export async function fillFn(examples: string[][], inputs: string[][]): Promise<
     return (inputs || []).map((row) => (row || []).map(() => results[k++] ?? ""));
   } catch (e) {
     return [[errorText(e)]];
+  }
+}
+
+/**
+ * Writes an Excel formula from a plain-English description.
+ * @customfunction FORMULA
+ * @param description What the formula should do, e.g. "sum column B where A > 100".
+ * @returns The generated formula as text (starts with =).
+ */
+export async function formulaFn(description: string): Promise<string> {
+  try {
+    return await writeFormula(description, await currentSettings(), deps);
+  } catch (e) {
+    return errorText(e);
+  }
+}
+
+/**
+ * Explains what an Excel formula does. Tip: =LLM.EXPLAIN(FORMULATEXT(A1)).
+ * @customfunction EXPLAIN
+ * @param formula The formula text to explain.
+ * @returns A plain-English explanation.
+ */
+export async function explainFn(formula: string): Promise<string> {
+  try {
+    return await explainFormula(formula, await currentSettings(), deps);
+  } catch (e) {
+    return errorText(e);
   }
 }
 

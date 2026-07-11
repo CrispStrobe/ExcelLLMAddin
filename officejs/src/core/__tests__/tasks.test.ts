@@ -15,6 +15,8 @@ import {
   editText,
   generateTable,
   fillByExample,
+  writeFormula,
+  explainFormula,
 } from "../tasks";
 import { LlmSettings, Deps, FetchLike } from "../llm";
 
@@ -228,6 +230,31 @@ describe("fillByExample", () => {
     const out = await fillByExample([{ input: "a", output: "A" }], ["x", "y"], settings, deps);
     expect(out).toEqual(["R", "R"]);
     expect(calls.length).toBe(3); // 1 batch + 2 per-input
+  });
+});
+
+describe("writeFormula", () => {
+  test("returns the formula as-is when clean", async () => {
+    const { deps } = mockFetch('=SUMIF(A:A,">100",B:B)');
+    expect(await writeFormula("sum B where A>100", settings, deps)).toBe('=SUMIF(A:A,">100",B:B)');
+  });
+
+  test("strips code fences and surrounding prose", async () => {
+    const { deps } = mockFetch("Here you go:\n```excel\n=XLOOKUP(A2,D:D,E:E)\n```");
+    expect(await writeFormula("lookup", settings, deps)).toBe("=XLOOKUP(A2,D:D,E:E)");
+  });
+
+  test("prepends = when the model omits it", async () => {
+    const { deps } = mockFetch("SUM(B2:B10)");
+    expect(await writeFormula("sum", settings, deps)).toBe("=SUM(B2:B10)");
+  });
+});
+
+describe("explainFormula", () => {
+  test("returns the explanation trimmed", async () => {
+    const { deps, calls } = mockFetch("  It sums B2:B10.  ");
+    expect(await explainFormula("=SUM(B2:B10)", settings, deps)).toBe("It sums B2:B10.");
+    expect(JSON.parse(calls[0].init.body).messages[1].content).toContain("=SUM(B2:B10)");
   });
 });
 
