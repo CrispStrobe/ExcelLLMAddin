@@ -92,6 +92,12 @@ export async function runPrompt(
   if (settings.proxyUrl) {
     const data = await callProxy("chat", promptText, settings, spec, deps);
     result = String(data.content ?? "");
+    if (deps.onUsage && data.usage) {
+      const p = Number(data.usage.prompt_tokens) || 0;
+      const c = Number(data.usage.completion_tokens) || 0;
+      const t = Number(data.usage.total_tokens) || p + c;
+      if (p || c || t) deps.onUsage({ promptTokens: p, completionTokens: c, totalTokens: t });
+    }
   } else {
     const baseUrl = settings.baseUrl || spec.defaultBaseUrl;
     if (spec.requiresKey && !settings.apiKey) {

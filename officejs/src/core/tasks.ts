@@ -330,8 +330,21 @@ export async function recall(
   const cands = candidates.map((c) => String(c)).filter((c) => c.trim() !== "");
   if (cands.length === 0) return [];
   const qVec = await embed(query, model, settings, deps); // throws if no model
-  const vecs = await Promise.all(cands.map((c) => embed(c, model, settings, deps)));
-  const scored: Array<[string, number]> = cands.map((c, i) => [c, cosine(qVec, vecs[i])]);
+  // Bound concurrency: a large range would otherwise fire hundreds of simultaneous
+  // embedding requests and trip provider rate limits. A failed embed sinks to the
+  // bottom rather than failing the whole search.
+  const scored: Array<[string, number]> = new Array(cands.length);
+  await runPool(
+    cands.map((c, i) => ({ c, i })),
+    8,
+    async ({ c, i }) => {
+      try {
+        scored[i] = [c, cosine(qVec, await embed(c, model, settings, deps))];
+      } catch {
+        scored[i] = [c, -1];
+      }
+    }
+  );
   scored.sort((a, b) => b[1] - a[1]);
   const top = k && k > 0 ? scored.slice(0, k) : scored;
   return top.map(([t, s]) => [t, Math.round(s * 1000) / 1000]);

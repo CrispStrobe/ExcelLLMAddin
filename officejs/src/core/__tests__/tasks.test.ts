@@ -148,6 +148,24 @@ describe("similarity / cosine", () => {
     const { deps } = embedMock([[1]]);
     await expect(recall("q", ["a"], 1, "", settings, deps)).rejects.toThrow(/embedding model/i);
   });
+
+  test("recall tolerates a failed candidate embed (it sinks to the bottom)", async () => {
+    // Query + good candidate succeed; the bad candidate's embed returns an error.
+    let n = 0;
+    const fetch: FetchLike = async () => {
+      n++;
+      if (n === 3) return { ok: false, status: 500, text: async () => `{"error":"boom"}` }; // 2nd candidate
+      return {
+        ok: true,
+        status: 200,
+        text: async () => JSON.stringify({ data: [{ embedding: [1, 0, 0] }] }),
+      };
+    };
+    const out = await recall("q", ["good", "bad"], 2, "m", settings, { fetch });
+    expect(out[0][0]).toBe("good");
+    expect(out[1][0]).toBe("bad");
+    expect(out[1][1]).toBeLessThan(0); // failed embed scored -1
+  });
 });
 
 describe("extractFields / ask", () => {

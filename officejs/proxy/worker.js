@@ -151,7 +151,22 @@ export default {
         data.choices?.[0]?.text ??
         data.message?.content;
       if (content == null) return json({ error: "No content in provider response" }, 502);
-      return json({ content: String(content) });
+      // Pass token usage back so the task-pane meter works on the proxy path too.
+      let usage;
+      if (data.usage) {
+        usage = {
+          prompt_tokens: data.usage.prompt_tokens || 0,
+          completion_tokens: data.usage.completion_tokens || 0,
+          total_tokens: data.usage.total_tokens || 0,
+        };
+      } else if (spec.style === "ollama" && (data.prompt_eval_count || data.eval_count)) {
+        usage = {
+          prompt_tokens: data.prompt_eval_count || 0,
+          completion_tokens: data.eval_count || 0,
+          total_tokens: (data.prompt_eval_count || 0) + (data.eval_count || 0),
+        };
+      }
+      return json({ content: String(content), usage });
     } catch (e) {
       return json({ error: e && e.message ? e.message : String(e) }, 502);
     }

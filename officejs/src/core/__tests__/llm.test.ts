@@ -179,6 +179,13 @@ describe("proxy transport", () => {
     expect(await listModels(proxied, deps)).toEqual(["a", "b"]);
   });
 
+  test("reports usage from the proxy response", async () => {
+    const { deps } = mockFetch(`{"content":"hi","usage":{"prompt_tokens":4,"completion_tokens":2,"total_tokens":6}}`);
+    const seen: any[] = [];
+    await runPrompt("x", proxied, { ...deps, onUsage: (u) => seen.push(u) });
+    expect(seen).toEqual([{ promptTokens: 4, completionTokens: 2, totalTokens: 6 }]);
+  });
+
   test("proxy error surfaces", async () => {
     const { deps } = mockFetch(`{"error":"upstream down"}`, { ok: false, status: 502 });
     await expect(runPrompt("x", proxied, deps)).rejects.toThrow("upstream down");
