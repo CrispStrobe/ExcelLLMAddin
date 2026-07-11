@@ -177,6 +177,20 @@ describe("mapRange", () => {
     expect(JSON.parse(calls[0].init.body).messages[1].content).toContain("describe");
   });
 
+  test("tolerates a trailing comma in the batch reply (no fallback)", async () => {
+    const { deps, calls } = mockFetch(`["A","B",]`);
+    const out = await mapRange([["a", "b"]], "up", settings, deps);
+    expect(out).toEqual([["A", "B"]]);
+    expect(calls.length).toBe(1); // repaired in-place, not per-cell
+  });
+
+  test("tolerates single-quoted strings in the batch reply", async () => {
+    const { deps, calls } = mockFetch(`['A', 'B']`);
+    const out = await mapRange([["a", "b"]], "up", settings, deps);
+    expect(out).toEqual([["A", "B"]]);
+    expect(calls.length).toBe(1);
+  });
+
   test("reports a per-cell error instead of throwing when the call fails", async () => {
     const fetch: FetchLike = async () => ({
       ok: false,

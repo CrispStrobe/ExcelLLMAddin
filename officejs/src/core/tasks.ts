@@ -286,12 +286,26 @@ function parseStringArray(raw: string): string[] | null {
   const start = s.indexOf("[");
   const end = s.lastIndexOf("]");
   if (start === -1 || end <= start) return null;
+  const parsed = tolerantJsonArray(s.slice(start, end + 1));
+  if (!Array.isArray(parsed)) return null;
+  return parsed.map((v) => (v == null ? "" : typeof v === "string" ? v : JSON.stringify(v)));
+}
+
+// Small/local models frequently emit *almost*-JSON arrays. Strict JSON.parse is
+// tried first; only on failure do we repair the two most common quirks (a trailing
+// comma before ] and single-quoted strings) and retry once. If the repair doesn't
+// yield valid JSON we return null and the caller takes its reliable per-cell path,
+// so a bad repair can never be worse than the un-repaired behavior.
+function tolerantJsonArray(slice: string): unknown {
   try {
-    const parsed = JSON.parse(s.slice(start, end + 1));
-    if (!Array.isArray(parsed)) return null;
-    return parsed.map((v) => (v == null ? "" : typeof v === "string" ? v : JSON.stringify(v)));
+    return JSON.parse(slice);
   } catch {
-    return null;
+    try {
+      const repaired = slice.replace(/,\s*]/g, "]").replace(/'([^'\\]*)'/g, '"$1"');
+      return JSON.parse(repaired);
+    } catch {
+      return null;
+    }
   }
 }
 
