@@ -10,6 +10,7 @@
 // path the add-in uses.
 
 import { runPrompt, listModels, embed, FetchLike, LlmSettings } from "../llm";
+import { fillByExample, generateTable, tagText, editText, writeFormula, analyzeImage } from "../tasks";
 
 const LIVE = process.env.LIVE_PROVIDERS === "1";
 const suite = LIVE ? describe : describe.skip;
@@ -63,6 +64,57 @@ suite("LIVE providers", () => {
         expect(models.length).toBeGreaterThan(0);
       });
     }
+  });
+
+  describe("new task functions (via Groq)", () => {
+    const key = process.env.GROQ_API_KEY;
+    const s: LlmSettings = { provider: "groq", model: "llama-3.3-70b-versatile", apiKey: key };
+    const t = key ? test : test.skip;
+
+    t("FILL infers a pattern from examples", async () => {
+      const out = await fillByExample([{ input: "Germany", output: "DE" }], ["France", "Spain"], s, deps);
+      expect(out).toHaveLength(2);
+      expect(out.join(" ").toUpperCase()).toContain("FR");
+    });
+
+    t("TABLE returns a multi-row grid", async () => {
+      const grid = await generateTable("3 largest planets with their diameter", s, deps);
+      expect(grid.length).toBeGreaterThan(1);
+      expect(grid[0].length).toBeGreaterThan(1);
+    });
+
+    t("TAG returns only valid labels", async () => {
+      const out = await tagText("The invoice total is wrong and the app crashes", ["Bug", "Billing", "Praise"], s, deps);
+      const labels = out ? out.split(",").map((x) => x.trim()) : [];
+      for (const l of labels) expect(["Bug", "Billing", "Praise"]).toContain(l);
+    });
+
+    t("EDIT fixes grammar", async () => {
+      const out = await editText("they is going too the store", undefined, s, deps);
+      expect(out.length).toBeGreaterThan(0);
+    });
+
+    t("FORMULA returns a formula string", async () => {
+      const f = await writeFormula("sum column B where column A is greater than 100", s, deps);
+      expect(f.startsWith("=")).toBe(true);
+    });
+  });
+
+  describe("vision (via Groq multimodal)", () => {
+    const key = process.env.GROQ_API_KEY;
+    const t = key ? test : test.skip;
+    // A 64x64 solid-red PNG as a data: URI — deterministic, no external image fetch.
+    const RED_PNG =
+      "data:image/png;base64," +
+      "iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAIAAAAlC+aJAAAAb0lEQVR4nO3PAQkAAAyEwO9feoshgnAB" +
+      "dLep8QUNyPEFDcjxBQ3I8QUNyPEFDcjxBQ3I8QUNyPEFDcjxBQ3I8QUNyPEFDcjxBQ3I8QUNyPEFDcjx" +
+      "BQ3I8QUNyPEFDcjxBQ3I8QUNyPEFDcjxBQ3IPanc8OLDQitxAAAAAElFTkSuQmCC";
+
+    t("VISION identifies the image color", async () => {
+      const s: LlmSettings = { provider: "groq", model: "meta-llama/llama-4-scout-17b-16e-instruct", apiKey: key };
+      const out = await analyzeImage(RED_PNG, "What color fills this image? One word.", s, deps);
+      expect(out.toLowerCase()).toContain("red");
+    });
   });
 
   describe("embeddings", () => {
