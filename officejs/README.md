@@ -113,14 +113,22 @@ the cross-platform CI gate. What's covered, all without Excel or a network:
 - **Transport** (`llm.ts`, `stream.ts`, `retry.ts`): direct + proxy
   chat/models/embeddings, SSE + NDJSON streaming, provider selection + routing
   (incl. every OpenAI-compat provider), headers, retry/backoff, and every error path.
-- **Tasks** (`tasks.ts`): all worksheet functions incl. `MAP` batching/fallback
-  and `SIMILARITY`/cosine.
+- **Tasks** (`tasks.ts`): all worksheet functions incl. `MAP` batching/fallback,
+  `SIMILARITY`/cosine, and `RECALL` — whose candidate embeddings are sent as one
+  batched request per ~96 rows (with a per-item fallback) instead of one request
+  per row.
 - **Agent** (`agent.ts`, `excelTools.ts`): the tool-calling loop, approve-before-
   apply, arguments as string (OpenAI) *or* object (Ollama), and the Excel tool
   handlers driven against a fake `Excel` global (address parsing, resize, formula
   matrices, formatting).
 - **MCP** (`mcp.ts`): JSON-RPC build + plain-JSON/SSE response parsing.
 - **Config** (`config.ts`): settings persistence over a faked `OfficeRuntime.storage`.
+- **Cache** (`cache.ts`, `persistentCache.ts`): the session LRU plus the
+  write-behind persistent cache that survives functions-runtime reloads — hydrate,
+  debounced flush, oversized-value (embedding) skipping, and storage-failure fallback.
+- **Provider catalog** (`providers.gen.test.ts`): asserts the generated TS/proxy
+  tables and the VBA `.bas` base URLs all match `shared/providers.json`, so a
+  provider-URL drift fails CI instead of shipping.
 - **Usage** (`usage.ts`): token-usage parsing (OpenAI + Ollama shapes) and the
   running session tracker behind the task-pane meter.
 
@@ -165,6 +173,22 @@ OPENROUTER_API_KEY=sk-or-... npm run harness:smoke
 Excel-only behaviour (custom-function registration, `=LLM.PROMPT` in a cell) still
 has to be checked in Excel — but everything else iterates here in seconds.
 
+## Provider catalog (single source of truth)
+
+All three editions (this TS project, the `proxy/worker.js`, and the VBA `.xlam`)
+read the **same** provider list from [`../shared/providers.json`](../shared/providers.json)
+— edit it there, never in the generated tables:
+
+```bash
+npm run gen:providers    # regenerate src/core/providers.generated.ts + the worker's PROVIDERS block
+npm run check:providers  # CI: exit non-zero if either is out of date
+```
+
+`src/core/providers.ts` keeps the types and endpoint helpers and re-exports the
+generated `PROVIDERS`. A Jest guard (`providers.gen.test.ts`) also checks the VBA
+base URLs against the JSON, so the editions can't silently drift (this is the test
+that caught the stale Nebius `…nebius.ai` → `…nebius.com` URL).
+
 ## Build for production
 
 ```bash
@@ -183,7 +207,8 @@ users then get it via **Insert ▸ Get Add-ins ▸ Add**.
 officejs/
   manifest.xml            # the add-in manifest (shared runtime; sideload/publish this)
   src/core/               # pure, unit-tested TS: providers, llm, tasks, agent,
-                          #   cache, streamParser, config
+                          #   cache, persistentCache, streamParser, config
+  src/core/providers.generated.ts  # generated from ../shared/providers.json — do not edit
   src/core/__tests__/     # Jest tests for the pure core (no Office/network)
   src/__tests__/          # Jest tests for the Office-facing edge (excelTools,
                           #   stream, mcp, browserFetch) via fake Excel/OfficeRuntime
@@ -195,7 +220,8 @@ officejs/
   src/harness/            # dev-only: run the task pane in a plain browser
   src/site/               # landing page + privacy/terms (deployed to Pages)
   proxy/worker.js         # optional serverless key-custody + CORS proxy
-  tools/                  # icon generator, harness smoke test
+  tools/                  # icon generator, harness smoke test, provider codegen
+  ../shared/providers.json  # single source of truth for the provider catalog (all editions)
   webpack.config.js       # build (generates functions.json from JSDoc)
 ```
 

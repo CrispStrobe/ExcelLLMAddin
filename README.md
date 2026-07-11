@@ -100,6 +100,11 @@ OpenAI · Mistral · Nebius · Scaleway · OpenRouter · Groq · Together · Cer
 Nebius, and local Ollama work directly from the browser; others use the optional
 key-custody proxy (`officejs/proxy/worker.js`).
 
+Both editions read the catalog from one source of truth,
+[`shared/providers.json`](shared/providers.json); the Office.js tables are
+generated from it (`npm run gen:providers`) and CI fails on drift, so a provider
+URL can't go stale in one edition only.
+
 ## Offline VBA edition (`.xlam`)
 
 The VBA add-in (repo root `.bas`/`.cls`) is **fully self-contained and offline** —
@@ -120,7 +125,9 @@ no hosting, no web server. It has near-parity with the Office.js edition:
   Requesty, and local Ollama. Configure the added cloud ones via the settings
   menu's **C** option (they share one OpenAI-compatible code path).
 - Solid plumbing: injected `IHttpClient` (WinHTTP/curl), real JSON (vendored
-  VBA-JSON), UTF-8, a response cache, and a `RunAllTests` self-test harness.
+  VBA-JSON), UTF-8, a response cache, batched embeddings for `=RECALL` (one
+  request for all candidates instead of one per row), and a `RunAllTests`
+  self-test harness.
 - Image generation: `=IMAGE_GEN("...")` returns a URL (pair with `=IMAGE()`), or run
   the `InsertAIImage` macro to drop the picture at the active cell. Set the key
   once with `SetImageKey`. (Black Forest Labs / FLUX; x-key auth.)
