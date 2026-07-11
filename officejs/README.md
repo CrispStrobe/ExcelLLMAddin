@@ -5,8 +5,11 @@ The modern, cross-platform version of the add-in: an Office Web Add-in that runs
 functions like `=LLM.PROMPT("…")` plus a settings task pane — no VBA, no curl, no
 temp files, and none of the encoding pain of the legacy `.xlam`.
 
-> The legacy VBA add-in still lives at the repo root and is kept as a stopgap.
-> This `officejs/` project is the going-forward product.
+> A second edition — the VBA `.xlam` at the repo root — is the **fully offline /
+> air-gapped** build (no hosting, no web server; pair it with local Ollama) and has
+> near-parity with this one. This `officejs/` project is the cross-platform edition
+> (Mac · Windows · Web · iPad) and adds AppSource, streaming, and the browser
+> harness. See the root `README.md` for the comparison.
 
 ## What you get
 
@@ -84,13 +87,27 @@ tool-calling-capable model (gpt-4o-mini, Claude, Llama-3.3, …).
 ## Test it (on any platform, no Excel)
 
 ```bash
-npm test         # Jest unit + functional tests over the core logic
+npm test         # 130+ Jest unit + functional tests (~99% line coverage)
 npm run typecheck
 ```
 
 The core (`src/core/*`) is Office-free and tested with a mocked `fetch`, so the
 request-build → parse → error pipeline is verified deterministically — this is
-the cross-platform CI gate.
+the cross-platform CI gate. What's covered, all without Excel or a network:
+
+- **Transport** (`llm.ts`, `stream.ts`): direct + proxy chat/models/embeddings,
+  SSE + NDJSON streaming, provider selection, headers, and every error path.
+- **Tasks** (`tasks.ts`): all worksheet functions incl. `MAP` batching/fallback
+  and `SIMILARITY`/cosine.
+- **Agent** (`agent.ts`, `excelTools.ts`): the tool-calling loop, approve-before-
+  apply, arguments as string (OpenAI) *or* object (Ollama), and the Excel tool
+  handlers driven against a fake `Excel` global (address parsing, resize, formula
+  matrices, formatting).
+- **MCP** (`mcp.ts`): JSON-RPC build + plain-JSON/SSE response parsing.
+- **Config** (`config.ts`): settings persistence over a faked `OfficeRuntime.storage`.
+
+Excel-only behaviour (custom-function registration, `=LLM.PROMPT` in a live cell)
+is checked separately — see `docs/MANUAL_TEST_CHECKLIST.md`.
 
 ## Dev harness (iterate on the task pane without Excel)
 
@@ -135,7 +152,9 @@ officejs/
   manifest.xml            # the add-in manifest (shared runtime; sideload/publish this)
   src/core/               # pure, unit-tested TS: providers, llm, tasks, agent,
                           #   cache, streamParser, config
-  src/core/__tests__/     # Jest tests (no Office/network)
+  src/core/__tests__/     # Jest tests for the pure core (no Office/network)
+  src/__tests__/          # Jest tests for the Office-facing edge (excelTools,
+                          #   stream, mcp, browserFetch) via fake Excel/OfficeRuntime
   src/functions/          # custom functions (=LLM.PROMPT, ... via CustomFunctions)
   src/taskpane/           # settings UI + Agent panel
   src/excelTools.ts       # Excel.run tool handlers the agent calls
