@@ -458,6 +458,14 @@ Private Sub Test_Agent_Tools()
     AssertEqual "agent/tools present", "True", CStr(tools.Count >= 5)
     AssertEqual "agent/write_range is a write tool", "True", CStr(IsWriteTool("write_range"))
     AssertEqual "agent/read_range is not a write tool", "False", CStr(IsWriteTool("read_range"))
+    AssertEqual "agent/create_chart is a write tool", "True", CStr(IsWriteTool("create_chart"))
+
+    ' create_chart must be registered in the tool list handed to the model.
+    Dim i As Long, hasChart As Boolean
+    For i = 1 To tools.Count
+        If tools(i)("function")("name") = "create_chart" Then hasChart = True
+    Next i
+    AssertTrue "agent/create_chart registered", hasChart
 End Sub
 
 Private Sub Test_Agent_2DArray()

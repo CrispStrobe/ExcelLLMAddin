@@ -226,12 +226,18 @@ Public Function GetAgentTools() As Collection
     props.Add "name", StrProp("new sheet name")
     t.Add ToolDef("add_worksheet", "Add a new worksheet.", ObjSchema(props, ReqArr("name")))
 
+    Set props = New Dictionary
+    props.Add "address", StrProp("A1 range holding the chart data (include headers)")
+    props.Add "chartType", StrProp("ColumnClustered, BarClustered, Line, Pie, XYScatter, or Area")
+    props.Add "title", StrProp("optional chart title")
+    t.Add ToolDef("create_chart", "Create a chart from a data range.", ObjSchema(props, ReqArr2("address", "chartType")))
+
     Set GetAgentTools = t
 End Function
 
 Public Function IsWriteTool(fname As String) As Boolean
     Select Case fname
-        Case "write_range", "write_formula", "set_format", "add_worksheet": IsWriteTool = True
+        Case "write_range", "write_formula", "set_format", "add_worksheet", "create_chart": IsWriteTool = True
         Case Else: IsWriteTool = False
     End Select
 End Function
@@ -254,6 +260,7 @@ Private Function ExecTool(fname As String, args As Object) As String
         Case "write_formula": ExecTool = Tool_WriteFormula(CStr(args("address")), CStr(args("formula")))
         Case "set_format": ExecTool = Tool_SetFormat(args)
         Case "add_worksheet": ExecTool = Tool_AddWorksheet(CStr(args("name")))
+        Case "create_chart": ExecTool = Tool_CreateChart(CStr(args("address")), CStr(args("chartType")), IIf(args.Exists("title"), CStr(args("title")), ""))
         Case Else: ExecTool = "Unknown tool: " & fname
     End Select
     Exit Function
@@ -330,6 +337,41 @@ Private Function Tool_AddWorksheet(wsName As String) As String
     Set ws = Application.ActiveWorkbook.Worksheets.Add
     ws.Name = wsName
     Tool_AddWorksheet = "Added worksheet '" & ws.Name & "'"
+End Function
+
+Private Function Tool_CreateChart(addr As String, chartType As String, title As String) As String
+    Dim rng As Range
+    Set rng = RangeFromAddress(addr)
+    Dim ws As Worksheet
+    Set ws = rng.Worksheet
+    Dim ch As ChartObject
+    Set ch = ws.ChartObjects.Add(Left:=rng.Left + rng.Width + 10, Top:=rng.Top, Width:=360, Height:=240)
+    ch.Chart.SetSourceData Source:=rng
+    ch.Chart.chartType = ResolveVbaChartType(chartType)
+    If title <> "" Then
+        ch.Chart.HasTitle = True
+        ch.Chart.ChartTitle.text = title
+    End If
+    Tool_CreateChart = "Created " & chartType & " chart from " & rng.Address(False, False)
+End Function
+
+' Map a loose chart-type name to an XlChartType. Column is the safe default.
+Private Function ResolveVbaChartType(ByVal t As String) As Long
+    Dim k As String, i As Long, ch As String
+    k = LCase$(Trim$(t))
+    Dim clean As String
+    For i = 1 To Len(k)
+        ch = Mid$(k, i, 1)
+        If ch >= "a" And ch <= "z" Then clean = clean & ch
+    Next i
+    Select Case clean
+        Case "bar", "barclustered": ResolveVbaChartType = xlBarClustered
+        Case "line": ResolveVbaChartType = xlLine
+        Case "pie": ResolveVbaChartType = xlPie
+        Case "scatter", "xyscatter": ResolveVbaChartType = xlXYScatter
+        Case "area": ResolveVbaChartType = xlArea
+        Case Else: ResolveVbaChartType = xlColumnClustered
+    End Select
 End Function
 
 ' ---- helpers ----------------------------------------------------------------
