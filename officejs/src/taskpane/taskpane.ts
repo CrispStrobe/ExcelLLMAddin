@@ -7,6 +7,7 @@ import { EXCEL_TOOLS, executeExcelTool, WRITE_TOOLS } from "../excelTools";
 import { connectMcp, browserMcpFetch } from "../mcp";
 import { resilientFetch as fetchLike } from "../browserFetch";
 import { usageTracker } from "../core/usage";
+import { estimateCost, formatUsd } from "../core/pricing";
 
 /* global setInterval */
 
@@ -78,8 +79,12 @@ function renderUsage(): void {
   if (t.calls === 0) {
     el.innerHTML = 'No usage yet. <a id="usageReset" href="#" class="link">reset</a>';
   } else {
+    // Cost is an estimate at the currently-selected model's list price.
+    const model = byId<HTMLInputElement>("model").value.trim();
+    const cost = estimateCost(t, model);
+    const costStr = cost != null ? ` ≈ ${formatUsd(cost)}` : "";
     el.innerHTML =
-      `${t.totalTokens.toLocaleString()} tokens this session ` +
+      `${t.totalTokens.toLocaleString()} tokens this session${costStr} ` +
       `<span class="muted">(${t.promptTokens.toLocaleString()} in / ${t.completionTokens.toLocaleString()} out, ${t.calls} calls)</span> ` +
       `<a id="usageReset" href="#" class="link">reset</a>`;
   }
