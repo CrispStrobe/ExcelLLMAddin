@@ -29,16 +29,30 @@ import {
 import { loadSettings } from "../core/config";
 import { resilientFetch as fetchLike } from "../browserFetch";
 import { createLruCache } from "../core/cache";
+import { createPersistentCache } from "../core/persistentCache";
 import { streamChat } from "../stream";
 import { generateImage } from "../core/imagegen";
 import { usageTracker, TokenUsage } from "../core/usage";
 
 /* global CustomFunctions */
 
-// Shared deps for all custom functions. The session cache means identical
-// (provider, model, prompt) calls don't re-hit the API on every Excel recalc;
-// errors are never cached. It resets when the functions runtime reloads.
-const deps = { fetch: fetchLike, cache: createLruCache(500), onUsage: (u: TokenUsage) => usageTracker.add(u) };
+// Shared deps for all custom functions. The cache means identical (provider,
+// model, prompt) calls don't re-hit the API on every Excel recalc; errors are
+// never cached. When OfficeRuntime.storage is available it persists small
+// results across functions-runtime reloads (embeddings stay in-memory only);
+// otherwise it degrades to a session-only LRU.
+function buildCache() {
+  try {
+    const store = (OfficeRuntime as unknown as { storage?: any } | undefined)?.storage;
+    if (store && typeof store.getItem === "function" && typeof store.setItem === "function") {
+      return createPersistentCache(store, { max: 500 });
+    }
+  } catch {
+    /* OfficeRuntime not available in this context — fall through */
+  }
+  return createLruCache(500);
+}
+const deps = { fetch: fetchLike, cache: buildCache(), onUsage: (u: TokenUsage) => usageTracker.add(u) };
 
 async function currentSettings(provider?: string, model?: string): Promise<LlmSettings> {
   const s = await loadSettings();
