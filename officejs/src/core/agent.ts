@@ -81,11 +81,16 @@ export async function chatWithTools(
   if (data?.error) throw new LlmError(typeof data.error === "string" ? data.error : data.error.message);
 
   const message = data?.choices?.[0]?.message ?? { role: "assistant", content: "" };
-  const toolCalls: ToolCall[] = (message.tool_calls || []).map((tc: any) => ({
-    id: tc.id,
-    name: tc.function?.name,
-    arguments: tc.function?.arguments ?? "{}",
-  }));
+  const toolCalls: ToolCall[] = (message.tool_calls || []).map((tc: any) => {
+    // OpenAI-style APIs return arguments as a JSON string; Ollama returns it as an
+    // already-parsed object. Normalize to a string so runAgent can JSON.parse it.
+    const a = tc.function?.arguments;
+    return {
+      id: tc.id,
+      name: tc.function?.name,
+      arguments: typeof a === "string" ? a : JSON.stringify(a ?? {}),
+    };
+  });
   return { message, toolCalls };
 }
 

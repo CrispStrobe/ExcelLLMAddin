@@ -65,6 +65,29 @@ describe("runAgent", () => {
     expect(secondBody.messages.some((m: any) => m.role === "tool" && m.content === "wrote 1 cell")).toBe(true);
   });
 
+  test("handles tool-call arguments as an object (Ollama), not just a string", async () => {
+    const ollamaStyle = JSON.stringify({
+      choices: [
+        {
+          message: {
+            role: "assistant",
+            content: null,
+            tool_calls: [
+              { id: "c1", type: "function", function: { name: "write_range", arguments: { address: "A1", values: [[42]] } } },
+            ],
+          },
+        },
+      ],
+    });
+    const { deps } = queueMock([ollamaStyle, finalResponse("done")]);
+    const executed: Array<{ name: string; args: any }> = [];
+    await runAgent("x", TOOLS, settings, deps, async (name, args) => {
+      executed.push({ name, args });
+      return "ok";
+    });
+    expect(executed).toEqual([{ name: "write_range", args: { address: "A1", values: [[42]] } }]);
+  });
+
   test("returns immediately when the model calls no tools", async () => {
     const { deps } = queueMock([finalResponse("Nothing to do.")]);
     const res = await runAgent("hi", TOOLS, settings, deps, async () => "unused");

@@ -93,12 +93,16 @@ Public Function RunAgentLoop(instruction As String, Optional maxSteps As Long = 
         For i = 1 To toolCalls.Count
             Dim tc As Object
             Set tc = toolCalls(i)
-            Dim fname As String, fargs As String
+            Dim fname As String
             fname = CStr(tc("function")("name"))
-            fargs = CStr(tc("function")("arguments"))
 
+            ' OpenAI returns arguments as a JSON string; Ollama returns an object.
             Dim argsObj As Object
-            Set argsObj = ParseArgs(fargs)
+            If IsObject(tc("function")("arguments")) Then
+                Set argsObj = tc("function")("arguments")
+            Else
+                Set argsObj = ParseArgs(CStr(tc("function")("arguments")))
+            End If
 
             Dim result As String
             If IsWriteTool(fname) Then
