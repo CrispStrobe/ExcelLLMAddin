@@ -28,9 +28,10 @@ jobs:
 
   vba-tests:
     name: VBA unit + functional tests (Windows/Excel)
-    # Requires a Windows runner with Desktop Excel installed. GitHub-hosted
-    # runners do NOT ship Excel, so use a self-hosted runner labelled 'excel'
-    # (a Windows box with Microsoft 365 / Excel Desktop).
+    # Requires a self-hosted Windows runner with Desktop Excel. Skipped by default
+    # so the workflow completes green on GitHub-hosted runners; set the repo
+    # variable HAS_WINDOWS_EXCEL_RUNNER=true once such a runner exists.
+    if: ${{ vars.HAS_WINDOWS_EXCEL_RUNNER == 'true' }}
     runs-on: [self-hosted, windows, excel]
     steps:
       - uses: actions/checkout@v4
