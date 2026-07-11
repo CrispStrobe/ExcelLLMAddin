@@ -75,6 +75,10 @@ a workbook anyway. Two supported setups:
   **Proxy URL**. Keys never touch the workbook. See `proxy/worker.js` header for
   deploy steps.
 
+`=LLM.IMAGE` (Black Forest Labs / FLUX) works with a BFL key set in **LLM
+Settings**, or — if the browser blocks BFL on CORS — through the proxy's `image`
+op (set a `BFL_API_KEY` worker secret).
+
 ## Agent (edit the sheet in plain English)
 
 The task pane has an **Agent** box. Describe a change and the model operates your

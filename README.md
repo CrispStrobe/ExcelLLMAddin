@@ -121,7 +121,8 @@ no hosting, no web server. It has near-parity with the Office.js edition:
   menu's **C** option (they share one OpenAI-compatible code path).
 - Solid plumbing: injected `IHttpClient` (WinHTTP/curl), real JSON (vendored
   VBA-JSON), UTF-8, a response cache, and a `RunAllTests` self-test harness.
-- Office.js-only: `STREAM` (VBA UDFs are synchronous -- no live cell updates).
+- Office.js-only: `STREAM` (VBA UDFs are synchronous) and `IMAGE` (async submit-
+  then-poll generation; the offline edition is text/agent-focused).
 
 **Build:** `pwsh tools/Build-Addin.ps1` on Windows+Excel, or import the modules in
 the VBA editor and Save As `.xlam` (Excel is required to compile VBA — it can't be
