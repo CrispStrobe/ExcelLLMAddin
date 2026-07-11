@@ -82,11 +82,11 @@ Public Function TAG(text As String, categories As Variant, Optional provider As 
     out = ChatComplete(sys, "Text:" & vbLf & text, provider, model)
     If Left$(out, 6) = "Error:" Then TAG = out: Exit Function
 
-    ' Keep only recognized labels (order-preserving) so the result is always clean.
-    Dim lc As String, res As String
-    lc = LCase$(out)
+    ' Keep only recognized labels (order-preserving, whole-word so "Bug" does not
+    ' match inside "debugging").
+    Dim res As String
     For i = 1 To cats.Count
-        If InStr(lc, LCase$(cats(i))) > 0 Then res = res & IIf(res = "", "", ", ") & cats(i)
+        If HasWord(out, CStr(cats(i))) Then res = res & IIf(res = "", "", ", ") & cats(i)
     Next i
     TAG = res
     Exit Function
@@ -682,6 +682,31 @@ Fail:
     Set ParseJsonStringArray = Nothing
 End Function
 
+' Case-insensitive whole-word test (a word is a run of letters/digits). Portable
+' (no VBScript.RegExp, which is absent on Mac Excel).
+Private Function HasWord(ByVal haystack As String, ByVal word As String) As Boolean
+    Dim hl As String, wl As String
+    hl = LCase$(haystack)
+    wl = LCase$(Trim$(word))
+    If wl = "" Then Exit Function
+    Dim pos As Long, afterPos As Long
+    Dim okBefore As Boolean, okAfter As Boolean
+    pos = InStr(hl, wl)
+    Do While pos > 0
+        okBefore = (pos = 1)
+        If Not okBefore Then okBefore = Not IsAlnumChar(Mid$(hl, pos - 1, 1))
+        afterPos = pos + Len(wl)
+        okAfter = (afterPos > Len(hl))
+        If Not okAfter Then okAfter = Not IsAlnumChar(Mid$(hl, afterPos, 1))
+        If okBefore And okAfter Then HasWord = True: Exit Function
+        pos = InStr(pos + 1, hl, wl)
+    Loop
+End Function
+
+Private Function IsAlnumChar(ByVal ch As String) As Boolean
+    IsAlnumChar = (ch Like "[0-9A-Za-z]")
+End Function
+
 ' Pull a clean "=..." formula out of a model reply (strip fences/backticks/prose).
 Private Function CleanFormula(ByVal raw As String) As String
     Dim s As String
@@ -692,9 +717,22 @@ Private Function CleanFormula(ByVal raw As String) As String
     s = Replace(s, "```", "")
     s = Replace(s, "`", "")
     s = Trim$(s)
-    Dim eq As Long
-    eq = InStr(s, "=")
-    If eq > 0 Then s = Mid$(s, eq)   ' drop any leading prose before '='
+    ' Find a formula-STARTING '=' (at the start or after whitespace/colon) so we
+    ' strip leading prose but never cut at an inner comparison like IF(A1=B1,...).
+    Dim idx As Long, p As Long, prev As String
+    idx = 0
+    For p = 1 To Len(s)
+        If Mid$(s, p, 1) = "=" Then
+            If p = 1 Then
+                idx = 1
+                Exit For
+            Else
+                prev = Mid$(s, p - 1, 1)
+                If prev = " " Or prev = ":" Or prev = vbTab Or prev = vbCr Or prev = vbLf Then idx = p: Exit For
+            End If
+        End If
+    Next p
+    If idx > 0 Then s = Mid$(s, idx)
     Dim lf As Long
     lf = InStr(s, vbLf)
     If lf > 0 Then s = Left$(s, lf - 1)   ' formula is a single line

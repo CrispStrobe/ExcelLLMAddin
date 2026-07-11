@@ -378,6 +378,9 @@ End Sub
 Private Sub Test_Task_Tag()
     InstallMock "{""message"":{""content"":""Billing and Feature apply here""}}"
     AssertEqual "task/tag multi-label", "Billing, Feature", TAG("...", "Bug,Billing,Feature", "ollama", "test-model")
+    ' Whole-word match: 'debugging' must not trip the 'Bug' label.
+    InstallMock "{""message"":{""content"":""about debugging the feature""}}"
+    AssertEqual "task/tag whole-word", "Feature", TAG("...", "Bug,Feature", "ollama", "test-model")
 End Sub
 
 Private Sub Test_Task_Edit()
@@ -389,6 +392,9 @@ Private Sub Test_Task_Formula()
     ' Model wraps the formula in a code fence; CleanFormula must strip it.
     InstallMock "{""message"":{""content"":""```\n=SUM(A2:A10)\n```""}}"
     AssertEqual "task/formula strips fences", "=SUM(A2:A10)", FORMULA("sum A2:A10", "ollama", "test-model")
+    ' Must NOT cut at an inner comparison '=' when the leading '=' is missing.
+    InstallMock "{""message"":{""content"":""IF(A1=B1,1,0)""}}"
+    AssertEqual "task/formula inner-eq preserved", "=IF(A1=B1,1,0)", FORMULA("compare", "ollama", "test-model")
 End Sub
 
 Private Sub Test_Task_Table()

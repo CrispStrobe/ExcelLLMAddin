@@ -96,9 +96,15 @@ export async function tagText(
     `Apply labels to the text. Choose ALL that apply from: ${cats.join(", ")}. ` +
     "Return only the matching labels as a comma-separated list, in the given order. If none apply, return nothing.";
   const out = await runPrompt(`Text:\n${text}`, withSystem(settings, system), deps);
-  // Keep only recognized labels (order-preserving) so the result is always clean.
-  const lc = out.toLowerCase();
-  return cats.filter((c) => lc.includes(c.toLowerCase())).join(", ");
+  // Keep only recognized labels (order-preserving, whole-word so "Bug" doesn't
+  // match inside "debugging").
+  return cats.filter((c) => hasWord(out, c)).join(", ");
+}
+
+/** Case-insensitive whole-word test (word = run of letters/digits). */
+function hasWord(text: string, word: string): boolean {
+  const esc = word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`(^|[^a-z0-9])${esc}([^a-z0-9]|$)`, "i").test(text);
 }
 
 /** Rewrite/edit text per an instruction (default: fix spelling & grammar). */
@@ -223,8 +229,10 @@ function cleanFormula(raw: string): string {
   const fence = s.match(/```(?:[a-z]*)?\s*([\s\S]*?)```/i);
   if (fence) s = fence[1].trim();
   s = s.replace(/^`+|`+$/g, "").trim();
-  const eq = s.indexOf("=");
-  if (eq >= 0) s = s.slice(eq); // drop any leading prose before the '='
+  // Strip leading prose by cutting at a formula-STARTING '=' (at the start, or
+  // after whitespace/a colon) — never at an inner comparison like IF(A1=B1,...).
+  const m = s.match(/(^|[\s:])=/);
+  if (m && m.index !== undefined) s = s.slice(m.index + m[0].length - 1);
   s = s.split("\n")[0].trim(); // formula is a single line
   if (s && !s.startsWith("=")) s = "=" + s;
   return s;

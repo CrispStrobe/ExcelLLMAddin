@@ -206,6 +206,11 @@ describe("tagText", () => {
     expect(await tagText("x", ["Bug", "Billing"], settings, deps)).toBe("");
   });
 
+  test("matches whole words only (debugging does not match Bug)", async () => {
+    const { deps } = mockFetch("This is about debugging the feature");
+    expect(await tagText("x", ["Bug", "Feature"], settings, deps)).toBe("Feature");
+  });
+
   test("errors with no categories", async () => {
     const { deps } = mockFetch("x");
     expect(await tagText("x", [], settings, deps)).toMatch(/no categories/);
@@ -287,6 +292,16 @@ describe("writeFormula", () => {
   test("prepends = when the model omits it", async () => {
     const { deps } = mockFetch("SUM(B2:B10)");
     expect(await writeFormula("sum", settings, deps)).toBe("=SUM(B2:B10)");
+  });
+
+  test("does not cut at an inner comparison = when the leading = is missing", async () => {
+    const { deps } = mockFetch("IF(A1=B1,1,0)");
+    expect(await writeFormula("compare", settings, deps)).toBe("=IF(A1=B1,1,0)");
+  });
+
+  test("strips same-line prose before the formula", async () => {
+    const { deps } = mockFetch("The formula is =XLOOKUP(A2,D:D,E:E)");
+    expect(await writeFormula("lookup", settings, deps)).toBe("=XLOOKUP(A2,D:D,E:E)");
   });
 });
 
