@@ -113,6 +113,48 @@ function promptCacheKey(settings: LlmSettings, promptText: string): string {
   return JSON.stringify([settings.provider, settings.model, settings.systemPrompt ?? "", promptText]);
 }
 
+/**
+ * Ask a question about an image (multimodal). Uses the OpenAI-compatible
+ * content-array shape, so it works for openai-style providers with a vision model
+ * (OpenAI, Gemini, OpenRouter, ...). Direct only — the proxy/Ollama paths use a
+ * different multimodal shape and aren't supported here.
+ */
+export async function visionPrompt(
+  question: string,
+  imageUrl: string,
+  settings: LlmSettings,
+  deps: Deps
+): Promise<string> {
+  const spec = requireProvider(settings.provider);
+  if (settings.proxyUrl) throw new LlmError("VISION requires a direct provider + key (not the proxy).");
+  if (spec.style === "ollama") throw new LlmError("VISION isn't supported for Ollama yet (different image format).");
+  const baseUrl = settings.baseUrl || spec.defaultBaseUrl;
+  if (spec.requiresKey && !settings.apiKey) throw new LlmError(`No API key configured for ${spec.label}.`);
+
+  const url = chatEndpoint(spec, baseUrl);
+  const body = {
+    model: settings.model,
+    messages: [
+      { role: "system", content: settings.systemPrompt ?? DEFAULT_SYSTEM_PROMPT },
+      {
+        role: "user",
+        content: [
+          { type: "text", text: question },
+          { type: "image_url", image_url: { url: imageUrl } },
+        ],
+      },
+    ],
+  };
+  const resp = await deps.fetch(url, {
+    method: "POST",
+    headers: directHeaders(spec, settings.apiKey),
+    body: JSON.stringify(body),
+  });
+  const text = await resp.text();
+  if (!resp.ok) throw new LlmError(parseErrorMessage(text) ?? `HTTP ${resp.status} from ${url}`);
+  return extractChatContent(text);
+}
+
 export async function listModels(
   settings: LlmSettings,
   deps: Deps

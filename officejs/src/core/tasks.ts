@@ -1,7 +1,7 @@
 // Higher-level LLM operations built on runPrompt. Each sets a task-specific
 // system prompt and post-processes the reply. Pure + testable (fetch injected).
 
-import { runPrompt, embed, LlmSettings, Deps } from "./llm";
+import { runPrompt, embed, visionPrompt, LlmSettings, Deps } from "./llm";
 
 function withSystem(settings: LlmSettings, system: string): LlmSettings {
   return { ...settings, systemPrompt: system };
@@ -173,6 +173,20 @@ async function fillOne(
     "new input — plain text, no labels or quotes.";
   const exBlock = examples.map((e) => `IN: ${e.input}  =>  OUT: ${e.output}`).join("\n");
   const out = await runPrompt(`${exBlock}\nIN: ${input}  =>  OUT:`, withSystem(settings, system), deps);
+  return out.trim();
+}
+
+/** Ask a question about an image (URL or data: URI). Needs a vision-capable model. */
+export async function analyzeImage(
+  image: string,
+  question: string,
+  settings: LlmSettings,
+  deps: Deps
+): Promise<string> {
+  const url = String(image).trim();
+  if (!url) return "Error: no image URL or data: URI provided";
+  const q = question && question.trim() ? question.trim() : "Describe this image.";
+  const out = await visionPrompt(q, url, settings, deps);
   return out.trim();
 }
 

@@ -23,6 +23,7 @@ import {
   fillByExample,
   writeFormula,
   explainFormula,
+  analyzeImage,
 } from "../core/tasks";
 import { loadSettings } from "../core/config";
 import { resilientFetch as fetchLike } from "../browserFetch";
@@ -260,6 +261,21 @@ export async function formulaFn(description: string): Promise<string> {
 export async function explainFn(formula: string): Promise<string> {
   try {
     return await explainFormula(formula, await currentSettings(), deps);
+  } catch (e) {
+    return errorText(e);
+  }
+}
+
+/**
+ * Asks a question about an image (needs a vision-capable model + direct provider).
+ * @customfunction VISION
+ * @param image An image URL or data: URI (or a cell containing one).
+ * @param question What to ask; defaults to describing the image.
+ * @returns The model's answer.
+ */
+export async function visionFn(image: string, question?: string): Promise<string> {
+  try {
+    return await analyzeImage(image, question ?? "", await currentSettings(), deps);
   } catch (e) {
     return errorText(e);
   }

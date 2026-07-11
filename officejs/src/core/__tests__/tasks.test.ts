@@ -17,6 +17,7 @@ import {
   fillByExample,
   writeFormula,
   explainFormula,
+  analyzeImage,
 } from "../tasks";
 import { LlmSettings, Deps, FetchLike } from "../llm";
 
@@ -255,6 +256,38 @@ describe("explainFormula", () => {
     const { deps, calls } = mockFetch("  It sums B2:B10.  ");
     expect(await explainFormula("=SUM(B2:B10)", settings, deps)).toBe("It sums B2:B10.");
     expect(JSON.parse(calls[0].init.body).messages[1].content).toContain("=SUM(B2:B10)");
+  });
+});
+
+describe("analyzeImage (VISION)", () => {
+  const visionSettings: LlmSettings = { provider: "openai", model: "gpt-4o", apiKey: "sk-test" };
+
+  test("builds a multimodal content array and returns the answer", async () => {
+    const { deps, calls } = mockFetch("A cat.");
+    const out = await analyzeImage("https://x/cat.png", "what is this?", visionSettings, deps);
+    expect(out).toBe("A cat.");
+    const msg = JSON.parse(calls[0].init.body).messages[1];
+    expect(msg.content[0]).toEqual({ type: "text", text: "what is this?" });
+    expect(msg.content[1]).toEqual({ type: "image_url", image_url: { url: "https://x/cat.png" } });
+  });
+
+  test("defaults the question when none is given", async () => {
+    const { deps, calls } = mockFetch("ok");
+    await analyzeImage("data:image/png;base64,AAAA", "", visionSettings, deps);
+    expect(JSON.parse(calls[0].init.body).messages[1].content[0].text).toMatch(/Describe this image/);
+  });
+
+  test("errors on an empty image without fetching", async () => {
+    const { deps, calls } = mockFetch(`{}`);
+    expect(await analyzeImage("", "q", visionSettings, deps)).toMatch(/no image/i);
+    expect(calls.length).toBe(0);
+  });
+
+  test("rejects the Ollama style (different image format)", async () => {
+    const { deps } = mockFetch(`{}`);
+    await expect(analyzeImage("https://x.png", "q", { provider: "ollama", model: "llava" }, deps)).rejects.toThrow(
+      /Ollama/
+    );
   });
 });
 
