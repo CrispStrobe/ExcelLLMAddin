@@ -74,6 +74,12 @@ Public Function RunAllTests(Optional ByVal showUI As Boolean = True) As Long
     Test_Task_Cosine
     Test_Task_Embed
 
+    ' --- agent (modAgent) ---
+    Test_Agent_Tools
+    Test_Agent_2DArray
+    Test_Agent_HexBool
+    Test_Agent_ChatWithTools
+
     ' --- validation guards ---
     Test_Prompt_MissingApiKey
 
@@ -354,6 +360,46 @@ Private Sub Test_Task_Embed()
     Else
         AssertEqual "task/embed vector length", "3", CStr(v.Count)
         AssertEqual "task/embed vector value", "2", CStr(v(2))
+    End If
+End Sub
+
+Private Sub Test_Agent_Tools()
+    Dim tools As Collection
+    Set tools = GetAgentTools()
+    AssertEqual "agent/tools present", "True", CStr(tools.Count >= 5)
+    AssertEqual "agent/write_range is a write tool", "True", CStr(IsWriteTool("write_range"))
+    AssertEqual "agent/read_range is not a write tool", "False", CStr(IsWriteTool("read_range"))
+End Sub
+
+Private Sub Test_Agent_2DArray()
+    Dim outer As New Collection, r1 As New Collection, r2 As New Collection
+    r1.Add 1: r1.Add 2
+    r2.Add 3: r2.Add 4
+    outer.Add r1: outer.Add r2
+    Dim a As Variant
+    a = CollectionTo2DArray(outer)
+    AssertEqual "agent/2darray dims", "2x2", CStr(UBound(a, 1)) & "x" & CStr(UBound(a, 2))
+    AssertEqual "agent/2darray value", "4", CStr(a(2, 2))
+End Sub
+
+Private Sub Test_Agent_HexBool()
+    AssertEqual "agent/hex color", CStr(RGB(255, 235, 156)), CStr(HexToColor("#FFEB9C"))
+    AssertEqual "agent/bool from string", "True", CStr(ToBool("true"))
+    AssertEqual "agent/bool from boolean", "True", CStr(ToBool(True))
+    AssertEqual "agent/bool false", "False", CStr(ToBool("no"))
+End Sub
+
+Private Sub Test_Agent_ChatWithTools()
+    InstallMock "{""choices"":[{""message"":{""role"":""assistant"",""content"":null,""tool_calls"":[{""id"":""c1"",""type"":""function"",""function"":{""name"":""write_range"",""arguments"":""{}""}}]}}]}"
+    Dim msgs As New Collection
+    msgs.Add MsgDict("system", "s")
+    msgs.Add MsgDict("user", "u")
+    Dim assistant As Object
+    Set assistant = ChatWithTools(msgs, GetAgentTools(), "openai", "gpt-4o-mini")
+    If assistant Is Nothing Then
+        AssertEqual "agent/ChatWithTools parses tool_calls", "write_range", "(nothing)"
+    Else
+        AssertEqual "agent/ChatWithTools parses tool_calls", "write_range", CStr(assistant("tool_calls")(1)("function")("name"))
     End If
 End Sub
 
