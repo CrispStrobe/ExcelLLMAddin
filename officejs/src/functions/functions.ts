@@ -24,6 +24,7 @@ import {
   writeFormula,
   explainFormula,
   analyzeImage,
+  recall,
 } from "../core/tasks";
 import { loadSettings } from "../core/config";
 import { resilientFetch as fetchLike } from "../browserFetch";
@@ -278,6 +279,37 @@ export async function visionFn(image: string, question?: string): Promise<string
     return await analyzeImage(image, question ?? "", await currentSettings(), deps);
   } catch (e) {
     return errorText(e);
+  }
+}
+
+/**
+ * Semantic search: returns the rows from a range most similar to a query, with
+ * scores. Needs an embedding model (set in LLM Settings or passed here).
+ * @customfunction RECALL
+ * @param query What to search for.
+ * @param candidates A range of text rows to search over.
+ * @param k Optional number of results (default 5).
+ * @param model Optional embedding model id.
+ * @returns Two columns: matched text and similarity score.
+ */
+export async function recallFn(
+  query: string,
+  candidates: string[][],
+  k?: number,
+  model?: string
+): Promise<string[][]> {
+  try {
+    const s = await currentSettings();
+    const m = (model && model.trim()) || s.embedModel || "";
+    const flat: string[] = [];
+    for (const row of candidates || []) for (const c of row || []) {
+      const t = String(c ?? "").trim();
+      if (t) flat.push(t);
+    }
+    const results = await recall(query, flat, k ?? 5, m, s, deps);
+    return results.length ? results.map(([t, sc]) => [t, String(sc)]) : [["(no matches)", ""]];
+  } catch (e) {
+    return [[errorText(e)]];
   }
 }
 

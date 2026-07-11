@@ -10,7 +10,7 @@
 // path the add-in uses.
 
 import { runPrompt, listModels, embed, FetchLike, LlmSettings } from "../llm";
-import { fillByExample, generateTable, tagText, editText, writeFormula, analyzeImage } from "../tasks";
+import { fillByExample, generateTable, tagText, editText, writeFormula, analyzeImage, recall } from "../tasks";
 
 const LIVE = process.env.LIVE_PROVIDERS === "1";
 const suite = LIVE ? describe : describe.skip;
@@ -129,6 +129,13 @@ suite("LIVE providers", () => {
         expect(Array.isArray(vec)).toBe(true);
         expect(vec.length).toBeGreaterThan(0);
         expect(typeof vec[0]).toBe("number");
+      });
+
+      t(`${c.id} RECALL ranks the semantically-closest row first`, async () => {
+        const s: LlmSettings = { provider: c.id, model: "", apiKey: c.key };
+        const rows = ["The cat sat on the mat.", "Quarterly revenue rose 12%.", "A feline rested on the rug."];
+        const out = await recall("a cat lay on a carpet", rows, 1, c.embedModel!, s, deps);
+        expect(out[0][0]).toMatch(/feline|cat/i); // one of the two cat sentences
       });
     }
   });

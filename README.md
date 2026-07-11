@@ -43,6 +43,7 @@ Worksheet functions (namespace `LLM`):
 | `=LLM.VISION(image, [question])` | Ask about an image (URL or data URI) |
 | `=LLM.ASK(question, context)` | Answer a question using a range as context |
 | `=LLM.SIMILARITY(a, b, [model])` | Semantic similarity (0–1) via embeddings |
+| `=LLM.RECALL(query, range, [k])` | Semantic search: top rows in a range by meaning |
 | `=LLM.MAP(range, instruction)` | Apply an instruction to every cell (batched) |
 | `=LLM.LIST_MODELS([provider])` · `=LLM.CONFIG()` | List models · show config |
 

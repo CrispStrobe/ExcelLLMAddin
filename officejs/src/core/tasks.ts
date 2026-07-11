@@ -314,6 +314,29 @@ export async function similarity(
   return cosine(va, vb);
 }
 
+/**
+ * Semantic search: rank candidate texts by embedding similarity to a query and
+ * return the top-k as [text, score] pairs (score rounded to 3 dp). The retrieval
+ * half of a "memory" — pair it with a range of notes/rows for RAG-in-a-cell.
+ */
+export async function recall(
+  query: string,
+  candidates: string[],
+  k: number,
+  model: string,
+  settings: LlmSettings,
+  deps: Deps
+): Promise<Array<[string, number]>> {
+  const cands = candidates.map((c) => String(c)).filter((c) => c.trim() !== "");
+  if (cands.length === 0) return [];
+  const qVec = await embed(query, model, settings, deps); // throws if no model
+  const vecs = await Promise.all(cands.map((c) => embed(c, model, settings, deps)));
+  const scored: Array<[string, number]> = cands.map((c, i) => [c, cosine(qVec, vecs[i])]);
+  scored.sort((a, b) => b[1] - a[1]);
+  const top = k && k > 0 ? scored.slice(0, k) : scored;
+  return top.map(([t, s]) => [t, Math.round(s * 1000) / 1000]);
+}
+
 export function cosine(a: number[], b: number[]): number {
   const n = Math.min(a.length, b.length);
   let dot = 0;

@@ -18,6 +18,7 @@ import {
   writeFormula,
   explainFormula,
   analyzeImage,
+  recall,
 } from "../tasks";
 import { LlmSettings, Deps, FetchLike } from "../llm";
 
@@ -126,6 +127,26 @@ describe("similarity / cosine", () => {
   test("similarity requires an embedding model", async () => {
     const { deps } = embedMock([[1]]);
     await expect(similarity("a", "b", "", settings, deps)).rejects.toThrow(/embedding model/i);
+  });
+
+  test("recall ranks candidates by cosine and returns top-k", async () => {
+    // Embed order: query, then each candidate.
+    const { deps } = embedMock([[1, 0, 0], [1, 0, 0], [0, 1, 0], [0.9, 0.1, 0]]);
+    const out = await recall("q", ["c1", "c2", "c3"], 2, "m", settings, deps);
+    expect(out).toHaveLength(2);
+    expect(out[0][0]).toBe("c1");
+    expect(out[0][1]).toBeCloseTo(1);
+    expect(out[1][0]).toBe("c3"); // 0.99 beats c2's 0
+  });
+
+  test("recall drops blank candidates and returns [] on none", async () => {
+    const { deps } = embedMock([[1]]);
+    expect(await recall("q", ["", "   "], 3, "m", settings, deps)).toEqual([]);
+  });
+
+  test("recall propagates the missing-embedding-model error", async () => {
+    const { deps } = embedMock([[1]]);
+    await expect(recall("q", ["a"], 1, "", settings, deps)).rejects.toThrow(/embedding model/i);
   });
 });
 
