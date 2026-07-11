@@ -80,6 +80,11 @@ Public Function RunAllTests(Optional ByVal showUI As Boolean = True) As Long
     Test_Agent_HexBool
     Test_Agent_ChatWithTools
 
+    ' --- MCP client (modMcp) ---
+    Test_Mcp_ParseRpc
+    Test_Mcp_ListTools
+    Test_Mcp_CallTool
+
     ' --- validation guards ---
     Test_Prompt_MissingApiKey
 
@@ -401,6 +406,31 @@ Private Sub Test_Agent_ChatWithTools()
     Else
         AssertEqual "agent/ChatWithTools parses tool_calls", "write_range", CStr(assistant("tool_calls")(1)("function")("name"))
     End If
+End Sub
+
+Private Sub Test_Mcp_ParseRpc()
+    Dim m As Object
+    Set m = ParseRpcResult("{""jsonrpc"":""2.0"",""id"":5,""result"":{""x"":1}}", 5)
+    AssertEqual "mcp/parse json result", "1", CStr(m("result")("x"))
+    Set m = ParseRpcResult("event: message" & vbLf & "data: {""jsonrpc"":""2.0"",""id"":6,""result"":{""y"":2}}" & vbLf, 6)
+    AssertEqual "mcp/parse SSE result", "2", CStr(m("result")("y"))
+End Sub
+
+Private Sub Test_Mcp_ListTools()
+    InstallMock "{""jsonrpc"":""2.0"",""id"":2,""result"":{""tools"":[{""name"":""search"",""description"":""web search"",""inputSchema"":{""type"":""object"",""properties"":{""q"":{""type"":""string""}}}}]}}"
+    Dim t As Collection
+    Set t = McpListTools("https://mcp.example/rpc", "")
+    If t Is Nothing Then
+        AssertEqual "mcp/list tools", "search", "(nothing)"
+    Else
+        AssertEqual "mcp/list tools count", "1", CStr(t.Count)
+        AssertEqual "mcp/list tool name", "search", CStr(t(1)("function")("name"))
+    End If
+End Sub
+
+Private Sub Test_Mcp_CallTool()
+    InstallMock "{""jsonrpc"":""2.0"",""id"":3,""result"":{""content"":[{""type"":""text"",""text"":""result text""}]}}"
+    AssertEqual "mcp/call tool text", "result text", McpCallTool("https://mcp.example/rpc", "search", New Dictionary, "")
 End Sub
 
 Private Function InstallMock(ByVal response As String) As MockHttpClient

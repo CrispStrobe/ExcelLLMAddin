@@ -15,6 +15,9 @@ Private Const AGENT_SYSTEM As String = _
     "notation (e.g. Sheet1!B2:B10). When the task is done, reply with a short summary " & _
     "and no further tool call."
 
+' MCP tool names active this run, for routing tool calls to the MCP server.
+Private mMcpNames As Object
+
 ' ---- entry point ------------------------------------------------------------
 
 Public Sub RunAgent()
@@ -45,6 +48,20 @@ Public Function RunAgentLoop(instruction As String, Optional maxSteps As Long = 
 
     Dim tools As Collection
     Set tools = GetAgentTools()
+
+    ' Merge in remote MCP tools if a server is configured (see modMcp.SetMcpServer).
+    Set mMcpNames = New Dictionary
+    If modMcp.McpUrl <> "" Then
+        Dim mcpTools As Collection
+        Set mcpTools = modMcp.McpListTools(modMcp.McpUrl, modMcp.McpToken)
+        If Not mcpTools Is Nothing Then
+            Dim mi As Long
+            For mi = 1 To mcpTools.Count
+                tools.Add mcpTools(mi)
+                mMcpNames(CStr(mcpTools(mi)("function")("name"))) = True
+            Next mi
+        End If
+    End If
 
     Dim pending As New Collection
     Dim log As String
@@ -219,6 +236,12 @@ End Function
 
 Private Function ExecTool(fname As String, args As Object) As String
     On Error GoTo Fail
+    If Not mMcpNames Is Nothing Then
+        If mMcpNames.Exists(fname) Then
+            ExecTool = modMcp.McpCallTool(modMcp.McpUrl, fname, args, modMcp.McpToken)
+            Exit Function
+        End If
+    End If
     Select Case fname
         Case "read_range": ExecTool = Tool_ReadRange(CStr(args("address")))
         Case "get_selection": ExecTool = Tool_GetSelection()
