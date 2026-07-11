@@ -77,6 +77,7 @@ Public Function RunAllTests(Optional ByVal showUI As Boolean = True) As Long
     Test_Task_Formula
     Test_Task_Table
     Test_Task_Fill
+    Test_Task_Recall
     Test_Task_Cosine
     Test_Task_Embed
 
@@ -406,6 +407,13 @@ Private Sub Test_Task_Fill()
     r = FILL(ex, ins, "ollama", "test-model")
     AssertEqual "task/fill FR", "FR", CStr(r(1, 1))
     AssertEqual "task/fill ES", "ES", CStr(r(2, 1))
+End Sub
+
+Private Sub Test_Task_Recall()
+    ' Deterministic guard (no HTTP): missing embedding model -> error.
+    Dim r As Variant
+    r = RECALL("q", "some text", 3, "")
+    AssertTrue "task/recall needs embed model", (Left$(CStr(r), 6) = "Error:")
 End Sub
 
 Private Sub Test_Task_Cosine()

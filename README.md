@@ -104,7 +104,7 @@ The VBA add-in (repo root `.bas`/`.cls`) is **fully self-contained and offline**
 no hosting, no web server. It has near-parity with the Office.js edition:
 
 - Functions: `=PROMPT`, `=CLASSIFY`, `=EXTRACT`, `=TRANSLATE`, `=SUMMARIZE`,
-  `=SENTIMENT`, `=ASK`, `=LIST`, `=FIELDS`, `=MAP`, `=SIMILARITY`, `=TAG`, `=EDIT`,
+  `=SENTIMENT`, `=ASK`, `=LIST`, `=FIELDS`, `=MAP`, `=SIMILARITY`, `=RECALL`, `=TAG`, `=EDIT`,
   `=FORMULA`, `=EXPLAIN`, `=LLMTABLE`, `=FILL`, `=LIST_MODELS`, `=LLM_CONFIG`
   (`modLLMFunctions.bas`, `modTasks.bas`). (`LLMTABLE` is the Office.js `TABLE`,
   renamed to avoid Excel's legacy Data-Table function.)

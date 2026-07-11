@@ -362,6 +362,70 @@ Fail:
     SIMILARITY = "Error: " & Err.Description
 End Function
 
+' =RECALL(query, candidates, [k], [embModel], [provider], [model]) -> top-k rows
+' from a range ranked by embedding similarity to the query, as [text, score].
+Public Function RECALL(query As String, candidates As Variant, Optional k As Long = 5, _
+                       Optional embModel As String = "", Optional provider As String = "", _
+                       Optional model As String = "") As Variant
+    On Error GoTo Fail
+    If embModel = "" Then RECALL = "Error: pass an embedding model": Exit Function
+
+    ' Flatten candidates to non-empty strings.
+    Dim texts As Collection: Set texts = New Collection
+    If IsArray(candidates) Then
+        Dim r As Long, c As Long, t As String
+        For r = LBound(candidates, 1) To UBound(candidates, 1)
+            For c = LBound(candidates, 2) To UBound(candidates, 2)
+                t = Trim$(CStr(candidates(r, c)))
+                If t <> "" Then texts.Add t
+            Next c
+        Next r
+    Else
+        Dim s As String: s = Trim$(CStr(candidates))
+        If s <> "" Then texts.Add s
+    End If
+    If texts.Count = 0 Then RECALL = "Error: no candidates": Exit Function
+
+    Dim qv As Object
+    Set qv = EmbedVector(query, embModel, provider)
+    If qv Is Nothing Then RECALL = "Error: embedding failed": Exit Function
+
+    Dim n As Long, i As Long
+    n = texts.Count
+    Dim scores() As Double, keep() As String
+    ReDim scores(1 To n)
+    ReDim keep(1 To n)
+    For i = 1 To n
+        keep(i) = texts(i)
+        Dim cv As Object
+        Set cv = EmbedVector(texts(i), embModel, provider)
+        If cv Is Nothing Then scores(i) = -1 Else scores(i) = Cosine(qv, cv)
+    Next i
+
+    ' Selection-pick the top-k by descending score.
+    Dim topN As Long
+    topN = k
+    If topN <= 0 Or topN > n Then topN = n
+    Dim outArr() As Variant
+    ReDim outArr(1 To topN, 1 To 2)
+    Dim picked As Long, j As Long, best As Long
+    Dim bestScore As Double
+    For picked = 1 To topN
+        best = 0: bestScore = -2
+        For j = 1 To n
+            If scores(j) > bestScore Then bestScore = scores(j): best = j
+        Next j
+        If best = 0 Then Exit For
+        outArr(picked, 1) = keep(best)
+        outArr(picked, 2) = Application.Round(bestScore, 3)
+        scores(best) = -2   ' mark as consumed
+    Next picked
+    RECALL = outArr
+    Exit Function
+Fail:
+    RECALL = "Error: " & Err.Description
+End Function
+
 ' ---- helpers ----------------------------------------------------------------
 
 Public Function MatchCategory(output As String, cats As Collection) As String
