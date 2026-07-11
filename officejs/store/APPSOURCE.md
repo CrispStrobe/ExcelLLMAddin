@@ -35,6 +35,28 @@ done here); the *submission* is human.
 | Submit for certification | **Human** (a real decision) |
 | Certification outcome | Microsoft (days) |
 
+## Readiness check (automated — last verified green)
+
+Everything the technical review checks is in place; only the Partner Center steps
+below are left. Re-run these before submitting:
+
+```bash
+cd officejs
+npm run build
+npx office-addin-manifest validate dist/manifest.xml     # => "The manifest is valid."
+```
+
+Verified:
+- **Submission manifest** (`dist/manifest.xml`) validates; real GUID
+  `fb886658-68fe-4712-90d5-0cf1c32e4913`, `<Version>1.0.0.0`, prod URLs only (no
+  `localhost`).
+- **Hosting** — all referenced URLs return HTTP 200 on GitHub Pages: manifest,
+  `taskpane.html`, `functions.json`, icons, and the mandatory `privacy.html` /
+  `terms.html`.
+- **Store assets** — icons (16/32/64/80/128) and two 1366×768 screenshots present
+  in `assets/` and `store/screenshots/` (swap the placeholder renders for real
+  in-Excel captures per `store/screenshots/README.md` before a public listing).
+
 ## Step 1 — enrol in Partner Center (human, one-time)
 
 1. Go to **partner.microsoft.com** and sign in with a work/Microsoft account.
@@ -85,11 +107,11 @@ The hosted, validated manifest to submit is
 
   > Bring large language models into Excel. Use simple worksheet functions —
   > =LLM.PROMPT, CLASSIFY, TAG, EXTRACT, FIELDS, TRANSLATE, SUMMARIZE, SENTIMENT,
-  > LIST, TABLE, FILL, EDIT, FORMULA, EXPLAIN, VISION, ASK, SIMILARITY, MAP, and a
-  > live-streaming STREAM — to run AI over your data right in the grid. A built-in
-  > agent goes further: describe a change in plain English and it reads and edits
-  > your workbook (ranges, formulas, formatting, sheets, charts) via tool-calling,
-  > with approve-before-apply safety.
+  > LIST, TABLE, FILL, EDIT, FORMULA, EXPLAIN, VISION, IMAGE, ASK, SIMILARITY,
+  > RECALL, MAP, and a live-streaming STREAM — to run AI over your data right in
+  > the grid. A built-in agent goes further: describe a change in plain English and
+  > it reads and edits your workbook (ranges, formulas, formatting, sheets, charts)
+  > via tool-calling, with approve-before-apply safety.
   >
   > Bring your own provider: OpenAI, Mistral, Nebius, Scaleway, OpenRouter, or a
   > local Ollama server. Your API keys stay on your device (or on your own
