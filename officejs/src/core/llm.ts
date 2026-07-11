@@ -14,6 +14,7 @@ import {
   modelsEndpoint,
   embeddingsEndpoint,
 } from "./providers";
+import { parseUsage, TokenUsage } from "./usage";
 
 export class LlmError extends Error {
   constructor(message: string) {
@@ -66,6 +67,8 @@ export interface Deps {
   fetch: FetchLike;
   /** If present, successful prompt results are served/stored here. */
   cache?: LlmCache;
+  /** Called with token usage parsed from each direct (non-proxy) response. */
+  onUsage?: (usage: TokenUsage) => void;
 }
 
 export const DEFAULT_SYSTEM_PROMPT =
@@ -106,6 +109,10 @@ export async function runPrompt(
       throw new LlmError(parseErrorMessage(text) ?? `HTTP ${resp.status} from ${url}`);
     }
     result = extractChatContent(text);
+    if (deps.onUsage) {
+      const usage = parseUsage(text, spec.style);
+      if (usage) deps.onUsage(usage);
+    }
   }
 
   // Only successful results reach here (errors throw above), so errors aren't cached.

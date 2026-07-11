@@ -6,6 +6,18 @@ import { runAgent, createApprovalExecutor, PendingAction, ToolExecutor } from ".
 import { EXCEL_TOOLS, executeExcelTool, WRITE_TOOLS } from "../excelTools";
 import { connectMcp, browserMcpFetch } from "../mcp";
 import { resilientFetch as fetchLike } from "../browserFetch";
+import { usageTracker } from "../core/usage";
+
+/* global setInterval */
+
+// Ready-to-run prompts for the agent box (a lightweight prompt library).
+const AGENT_PRESETS: Array<{ label: string; text: string }> = [
+  { label: "Sum & highlight", text: "In the first empty cell below column B, put the sum of column B, then bold any cell over 100." },
+  { label: "Classify selection", text: "Add a column that classifies each row of my selection as High, Medium, or Low." },
+  { label: "Clean data", text: "Trim whitespace and fix capitalization in my selected range, writing the cleaned values back." },
+  { label: "Summarize sheet", text: "Read the used range and write a 3-bullet summary of what this sheet contains into a new cell." },
+  { label: "Chart it", text: "Create a clustered column chart from my selected range with a sensible title." },
+];
 
 /* global Office, document, window */
 
@@ -27,7 +39,59 @@ function initUi(): void {
   byId<HTMLButtonElement>("reload").onclick = () => window.location.reload();
   byId<HTMLButtonElement>("agentRun").onclick = onAgentRun;
   byId<HTMLButtonElement>("agentApply").onclick = onAgentApply;
+  buildPresets();
+  byId<HTMLAnchorElement>("usageReset").onclick = (e) => {
+    e.preventDefault();
+    usageTracker.reset();
+    renderUsage();
+  };
+  renderUsage();
+  // Custom-function calls report into the same tracker; poll so the meter reflects them.
+  setInterval(renderUsage, 3000);
   updateKeyHint();
+}
+
+/** Deps for pane-initiated calls, feeding the shared usage meter. */
+function paneDeps() {
+  return { fetch: fetchLike, onUsage: usageTracker.add.bind(usageTracker) };
+}
+
+function buildPresets(): void {
+  const box = byId<HTMLDivElement>("agentPresets");
+  box.textContent = "";
+  for (const p of AGENT_PRESETS) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "chip";
+    b.textContent = p.label;
+    b.title = p.text;
+    b.onclick = () => {
+      byId<HTMLTextAreaElement>("agentInput").value = p.text;
+    };
+    box.appendChild(b);
+  }
+}
+
+function renderUsage(): void {
+  const t = usageTracker.total();
+  const el = byId<HTMLParagraphElement>("usage");
+  if (t.calls === 0) {
+    el.innerHTML = 'No usage yet. <a id="usageReset" href="#" class="link">reset</a>';
+  } else {
+    el.innerHTML =
+      `${t.totalTokens.toLocaleString()} tokens this session ` +
+      `<span class="muted">(${t.promptTokens.toLocaleString()} in / ${t.completionTokens.toLocaleString()} out, ${t.calls} calls)</span> ` +
+      `<a id="usageReset" href="#" class="link">reset</a>`;
+  }
+  // Re-bind the reset link (innerHTML replaced it).
+  const reset = document.getElementById("usageReset") as HTMLAnchorElement | null;
+  if (reset) {
+    reset.onclick = (e) => {
+      e.preventDefault();
+      usageTracker.reset();
+      renderUsage();
+    };
+  }
 }
 
 if (document.readyState === "loading") {
@@ -82,7 +146,8 @@ async function onAgentRun(): Promise<void> {
       executor = wrapped.executor;
       queued = wrapped.pending;
     }
-    const res = await runAgent(input, tools, settings, { fetch: fetchLike }, executor);
+    const res = await runAgent(input, tools, settings, paneDeps(), executor);
+    renderUsage();
     const lines = res.steps.map((s) => `• ${s.tool}(${clip(JSON.stringify(s.args))}) → ${clip(s.result)}`);
     lines.push("", res.finalText || "(done)");
     log.textContent = lines.join("\n");
@@ -168,7 +233,8 @@ async function onSave(): Promise<void> {
 async function onTest(): Promise<void> {
   setStatus("Testing…", "");
   try {
-    const reply = await runPrompt("Reply with exactly: Hello from Excel", readForm(), { fetch: fetchLike });
+    const reply = await runPrompt("Reply with exactly: Hello from Excel", readForm(), paneDeps());
+    renderUsage();
     setStatus("OK: " + reply, "ok");
   } catch (e) {
     setStatus(errText(e), "err");

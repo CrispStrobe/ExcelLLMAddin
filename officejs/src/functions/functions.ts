@@ -31,13 +31,14 @@ import { resilientFetch as fetchLike } from "../browserFetch";
 import { createLruCache } from "../core/cache";
 import { streamChat } from "../stream";
 import { generateImage } from "../core/imagegen";
+import { usageTracker, TokenUsage } from "../core/usage";
 
 /* global CustomFunctions */
 
 // Shared deps for all custom functions. The session cache means identical
 // (provider, model, prompt) calls don't re-hit the API on every Excel recalc;
 // errors are never cached. It resets when the functions runtime reloads.
-const deps = { fetch: fetchLike, cache: createLruCache(500) };
+const deps = { fetch: fetchLike, cache: createLruCache(500), onUsage: (u: TokenUsage) => usageTracker.add(u) };
 
 async function currentSettings(provider?: string, model?: string): Promise<LlmSettings> {
   const s = await loadSettings();

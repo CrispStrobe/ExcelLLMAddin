@@ -135,6 +135,22 @@ describe("new OpenAI-compat providers route through runPrompt", () => {
   });
 });
 
+describe("usage reporting", () => {
+  test("runPrompt reports parsed token usage via onUsage", async () => {
+    const { deps } = mockFetch(`{"choices":[{"message":{"content":"hi"}}],"usage":{"prompt_tokens":9,"completion_tokens":6,"total_tokens":15}}`);
+    const seen: any[] = [];
+    await runPrompt("x", openai, { ...deps, onUsage: (u) => seen.push(u) });
+    expect(seen).toEqual([{ promptTokens: 9, completionTokens: 6, totalTokens: 15 }]);
+  });
+
+  test("no onUsage call when the response omits usage", async () => {
+    const { deps } = mockFetch(`{"choices":[{"message":{"content":"hi"}}]}`);
+    const seen: any[] = [];
+    await runPrompt("x", openai, { ...deps, onUsage: (u) => seen.push(u) });
+    expect(seen).toEqual([]);
+  });
+});
+
 describe("listModels", () => {
   test("ollama", async () => {
     const { deps } = mockFetch(`{"models":[{"name":"llama3.2"},{"name":"mistral"}]}`);

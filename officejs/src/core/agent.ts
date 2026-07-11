@@ -9,6 +9,7 @@ import {
   chatEndpoint,
 } from "./providers";
 import { LlmSettings, LlmError, directHeaders, Deps } from "./llm";
+import { parseUsage } from "./usage";
 
 export interface ToolSchema {
   name: string;
@@ -76,6 +77,10 @@ export async function chatWithTools(
   });
   const text = await resp.text();
   if (!resp.ok) throw new LlmError(errorMessage(text) ?? `HTTP ${resp.status}`);
+  if (deps.onUsage) {
+    const usage = parseUsage(text, spec.style);
+    if (usage) deps.onUsage(usage);
+  }
 
   const data = safeJson(text) as any;
   if (data?.error) throw new LlmError(typeof data.error === "string" ? data.error : data.error.message);
