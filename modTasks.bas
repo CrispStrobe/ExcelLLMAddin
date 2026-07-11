@@ -238,6 +238,81 @@ Public Function VISION(image As String, Optional question As String = "", _
     VISION = TrimResult(ChatCompleteVision(q, img, provider, model))
 End Function
 
+' =IMAGE_GEN(prompt, [width], [height], [model]) -> a generated image URL.
+' Backed by Black Forest Labs (FLUX): submit then poll. Set the key with the
+' SetImageKey macro. Pair with Excel's IMAGE(): =IMAGE(IMAGE_GEN("a red bike")).
+' (Named IMAGE_GEN because a bare IMAGE would clash with Excel's built-in IMAGE.)
+Public Function IMAGE_GEN(prompt As String, Optional width As Long = 1024, _
+                          Optional height As Long = 768, Optional model As String = "") As String
+    On Error GoTo Fail
+    If Trim$(prompt) = "" Then IMAGE_GEN = "Error: no prompt provided": Exit Function
+
+    Dim key As String
+    key = GetAPIKey("bfl")
+    If key = "" Then IMAGE_GEN = "Error: no BFL image key set -- run the SetImageKey macro": Exit Function
+    Dim m As String
+    m = model
+    If m = "" Then m = "flux-dev"
+
+    Dim body As Object
+    Set body = New Dictionary
+    body.Add "prompt", prompt
+    body.Add "width", width
+    body.Add "height", height
+
+    Dim client As IHttpClient
+    Set client = modHttp.CreateHttpClient()
+    Dim resp As String
+    resp = client.PostJson("https://api.bfl.ai/v1/" & m, JsonConverter.ConvertToJson(body), key, "bfl")
+    If Left$(resp, 6) = "Error:" Then IMAGE_GEN = resp: Exit Function
+
+    Dim subObj As Object
+    Set subObj = JsonConverter.ParseJson(resp)
+    If Not subObj.Exists("polling_url") Then IMAGE_GEN = "Error: no polling_url from BFL": Exit Function
+    Dim pollUrl As String
+    pollUrl = CStr(subObj("polling_url"))
+
+    Dim i As Long, status As String
+    For i = 1 To 30
+        SleepSeconds 2
+        Dim pr As String
+        pr = client.GetJson(pollUrl, key, "bfl")
+        If Left$(pr, 6) <> "Error:" Then
+            Dim pd As Object
+            Set pd = JsonConverter.ParseJson(pr)
+            status = ""
+            If pd.Exists("status") Then status = CStr(pd("status"))
+            If status = "Ready" Then
+                Dim url As String
+                url = ""
+                On Error Resume Next
+                url = CStr(pd("result")("sample"))
+                On Error GoTo Fail
+                If url = "" Then IMAGE_GEN = "Error: BFL result had no image": Exit Function
+                IMAGE_GEN = url
+                Exit Function
+            ElseIf status = "Error" Or status = "Failed" Or status = "Content Moderated" Or status = "Request Moderated" Then
+                IMAGE_GEN = "Error: image generation " & status
+                Exit Function
+            End If
+        End If
+    Next i
+    IMAGE_GEN = "Error: image generation timed out"
+    Exit Function
+Fail:
+    IMAGE_GEN = "Error: " & Err.Description
+End Function
+
+' Delay that works in any context (a UDF can't use Application.Wait). Busy-waits,
+' so Excel is unresponsive for the interval -- fine for a deliberate image call.
+Private Sub SleepSeconds(ByVal secs As Double)
+    Dim t0 As Double
+    t0 = Timer
+    Do While Timer < t0 + secs
+        If Timer < t0 Then Exit Do   ' guard against midnight wrap-around
+    Loop
+End Sub
+
 ' =ASK(question, context, ...) -> answer using the context range/text.
 Public Function ASK(question As String, context As Variant, Optional provider As String = "", Optional model As String = "") As String
     Dim ctx As String

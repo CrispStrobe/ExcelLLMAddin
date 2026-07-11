@@ -538,6 +538,42 @@ Public Sub QuickTest()
     If DEBUG_MODE Then Debug.Print "=== QuickTest END ==="
 End Sub
 
+' Store the Black Forest Labs image key (used by =IMAGE_GEN and InsertAIImage).
+Public Sub SetImageKey()
+    Dim k As String
+    k = InputBox("Enter your Black Forest Labs (FLUX) API key for image generation:", "Image Key")
+    If Trim$(k) = "" Then Exit Sub
+    Call SetProviderKey("bfl", Trim$(k))
+    Call SaveConfig
+    MsgBox "Image key saved. Use =IMAGE_GEN(""a red bike"") or run InsertAIImage.", vbInformation
+End Sub
+
+' Generate an image from a prompt and drop it at the active cell.
+Public Sub InsertAIImage()
+    On Error GoTo Fail
+    Dim prompt As String
+    prompt = InputBox("Describe the image to generate (FLUX):", "AI Image")
+    If Trim$(prompt) = "" Then Exit Sub
+
+    Application.StatusBar = "Generating image... (Excel is busy while it renders)"
+    Dim url As String
+    url = IMAGE_GEN(prompt)
+    Application.StatusBar = False
+
+    If Left$(url, 6) = "Error:" Then MsgBox url, vbExclamation: Exit Sub
+
+    Dim tgt As Range
+    Set tgt = ActiveCell
+    Dim pic As Object
+    Set pic = ActiveSheet.Pictures.Insert(url)
+    pic.Left = tgt.Left
+    pic.Top = tgt.Top
+    Exit Sub
+Fail:
+    Application.StatusBar = False
+    MsgBox "Error: " & Err.Description, vbCritical
+End Sub
+
 ' Full diagnostic
 Public Sub FullDiagnostic()
     Dim msg As String

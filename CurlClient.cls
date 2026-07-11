@@ -99,7 +99,12 @@ Private Function BuildCurlConfig(ByVal method As String, ByVal url As String, By
     End If
 
     If apiKey <> "" Then
-        c = c & "header = ""Authorization: Bearer " & CfgEsc(apiKey) & """" & vbLf
+        If LCase$(provider) = "bfl" Then
+            ' BFL (image generation) authenticates with x-key, not Bearer.
+            c = c & "header = ""x-key: " & CfgEsc(apiKey) & """" & vbLf
+        Else
+            c = c & "header = ""Authorization: Bearer " & CfgEsc(apiKey) & """" & vbLf
+        End If
     End If
     If LCase$(provider) = "openrouter" Then
         c = c & "header = ""HTTP-Referer: https://excel-addin""" & vbLf

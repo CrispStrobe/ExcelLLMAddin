@@ -107,7 +107,7 @@ no hosting, no web server. It has near-parity with the Office.js edition:
 
 - Functions: `=PROMPT`, `=CLASSIFY`, `=EXTRACT`, `=TRANSLATE`, `=SUMMARIZE`,
   `=SENTIMENT`, `=ASK`, `=LIST`, `=FIELDS`, `=MAP`, `=SIMILARITY`, `=RECALL`, `=TAG`, `=EDIT`,
-  `=FORMULA`, `=EXPLAIN`, `=LLMTABLE`, `=FILL`, `=VISION`, `=LIST_MODELS`, `=LLM_CONFIG`
+  `=FORMULA`, `=EXPLAIN`, `=LLMTABLE`, `=FILL`, `=VISION`, `=IMAGE_GEN`, `=LIST_MODELS`, `=LLM_CONFIG`
   (`modLLMFunctions.bas`, `modTasks.bas`). (`LLMTABLE` is the Office.js `TABLE`,
   renamed to avoid Excel's legacy Data-Table function.)
 - **Agent** (`modAgent.bas`) — run the `RunAgent` macro; the model edits the sheet
@@ -121,8 +121,10 @@ no hosting, no web server. It has near-parity with the Office.js edition:
   menu's **C** option (they share one OpenAI-compatible code path).
 - Solid plumbing: injected `IHttpClient` (WinHTTP/curl), real JSON (vendored
   VBA-JSON), UTF-8, a response cache, and a `RunAllTests` self-test harness.
-- Office.js-only: `STREAM` (VBA UDFs are synchronous) and `IMAGE` (async submit-
-  then-poll generation; the offline edition is text/agent-focused).
+- Image generation: `=IMAGE_GEN("...")` returns a URL (pair with `=IMAGE()`), or run
+  the `InsertAIImage` macro to drop the picture at the active cell. Set the key
+  once with `SetImageKey`. (Black Forest Labs / FLUX; x-key auth.)
+- Office.js-only: `STREAM` (VBA UDFs are synchronous -- no live cell updates).
 
 **Build:** `pwsh tools/Build-Addin.ps1` on Windows+Excel, or import the modules in
 the VBA editor and Save As `.xlam` (Excel is required to compile VBA — it can't be

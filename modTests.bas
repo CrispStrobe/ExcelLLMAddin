@@ -78,6 +78,7 @@ Public Function RunAllTests(Optional ByVal showUI As Boolean = True) As Long
     Test_Task_Table
     Test_Task_Fill
     Test_Task_Vision
+    Test_Task_ImageGuards
     Test_Task_Recall
     Test_Task_Cosine
     Test_Task_Embed
@@ -419,6 +420,14 @@ Private Sub Test_Task_Vision()
     AssertEqual "task/vision content", "A cat.", out
     AssertTrue "task/vision body has image_url", (InStr(mock.LastBody, "image_url") > 0)
     AssertTrue "task/vision body carries the url", (InStr(mock.LastBody, "https://x/cat.png") > 0)
+End Sub
+
+Private Sub Test_Task_ImageGuards()
+    ' Deterministic guards (no HTTP): empty prompt, and no key set.
+    AssertTrue "task/image empty prompt", (Left$(IMAGE_GEN(""), 6) = "Error:")
+    ' With no BFL key configured, IMAGE_GEN reports a helpful error (ProviderKeys
+    ' has no "bfl" entry in the test config).
+    AssertTrue "task/image no key", (InStr(IMAGE_GEN("a red square"), "image key") > 0)
 End Sub
 
 Private Sub Test_Task_Recall()

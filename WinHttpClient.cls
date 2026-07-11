@@ -35,7 +35,7 @@ Private Function IHttpClient_PostJson(ByVal url As String, ByVal body As String,
 
     http.Open "POST", url, False
     http.SetRequestHeader "Content-Type", "application/json"
-    If apiKey <> "" Then http.SetRequestHeader "Authorization", "Bearer " & apiKey
+    ApplyAuthHeader http, apiKey, provider
     ApplyProviderHeaders http, provider
 
     http.Send StringToUtf8Bytes(body)
@@ -55,7 +55,7 @@ Private Function IHttpClient_GetJson(ByVal url As String, _
     http.SetTimeouts RESOLVE_TIMEOUT, CONNECT_TIMEOUT, SEND_TIMEOUT, RECEIVE_TIMEOUT
 
     http.Open "GET", url, False
-    If apiKey <> "" Then http.SetRequestHeader "Authorization", "Bearer " & apiKey
+    ApplyAuthHeader http, apiKey, provider
     ApplyProviderHeaders http, provider
 
     http.Send
@@ -65,6 +65,16 @@ Private Function IHttpClient_GetJson(ByVal url As String, _
 Fail:
     IHttpClient_GetJson = "Error: " & Err.Number & " - " & Err.Description
 End Function
+
+' Auth header: BFL (image generation) uses x-key; everything else uses Bearer.
+Private Sub ApplyAuthHeader(ByVal http As Object, ByVal apiKey As String, ByVal provider As String)
+    If apiKey = "" Then Exit Sub
+    If LCase$(provider) = "bfl" Then
+        http.SetRequestHeader "x-key", apiKey
+    Else
+        http.SetRequestHeader "Authorization", "Bearer " & apiKey
+    End If
+End Sub
 
 Private Sub ApplyProviderHeaders(ByVal http As Object, ByVal provider As String)
     If LCase$(provider) = "openrouter" Then
