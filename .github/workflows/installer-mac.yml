@@ -1,0 +1,57 @@
+name: Build signed macOS installer (.xlam)
+
+# Wraps the offline ExcelLLMAddin.xlam in a signed + notarized .pkg on a macOS
+# runner (this is the CI-doable half of the installer).
+#
+# PREREQUISITE: a built ExcelLLMAddin.xlam must exist at the repo root. Building
+# the .xlam from the .bas requires Excel and CANNOT run here or on any Mac — do it
+# on a Windows machine (tools/Build-Addin.ps1) or via a one-time manual import in
+# Excel for Mac, then commit the .xlam.
+#
+# Secrets required:
+#   APPLE_INSTALLER_CERT_P12  base64 of a "Developer ID Installer" .p12
+#   APPLE_CERT_PASSWORD       its password
+#   APPLE_SIGN_IDENTITY       e.g. "Developer ID Installer: Name (TEAMID)"
+#   AC_KEY_ID, AC_ISSUER_ID   App Store Connect API key id + issuer
+#   AC_KEY_P8                 base64 of the AuthKey_XXXX.p8 (for notarytool)
+
+on:
+  workflow_dispatch:
+  push:
+    tags: [ "v*" ]
+
+jobs:
+  installer:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Import Developer ID Installer certificate
+        env:
+          P12: ${{ secrets.APPLE_INSTALLER_CERT_P12 }}
+          P12_PW: ${{ secrets.APPLE_CERT_PASSWORD }}
+        run: |
+          KEYCHAIN=build.keychain
+          security create-keychain -p ci "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p ci "$KEYCHAIN"
+          echo "$P12" | base64 --decode > cert.p12
+          security import cert.p12 -k "$KEYCHAIN" -P "$P12_PW" -T /usr/bin/productbuild -T /usr/bin/codesign
+          security list-keychains -d user -s "$KEYCHAIN" login.keychain
+          security set-key-partition-list -S apple-tool:,apple:,codesign:,productsign: -s -k ci "$KEYCHAIN"
+          rm -f cert.p12
+
+      - name: Build, sign, and notarize the .pkg
+        env:
+          SIGN_IDENTITY: ${{ secrets.APPLE_SIGN_IDENTITY }}
+          AC_KEY_ID: ${{ secrets.AC_KEY_ID }}
+          AC_ISSUER_ID: ${{ secrets.AC_ISSUER_ID }}
+        run: |
+          echo "${{ secrets.AC_KEY_P8 }}" | base64 --decode > ac_key.p8
+          AC_KEY_PATH="$PWD/ac_key.p8" ./installer/mac-xlam/build-xlam-pkg.sh
+          rm -f ac_key.p8
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ExcelLLMAddin-Offline-pkg
+          path: installer/mac-xlam/ExcelLLMAddin-Offline.pkg

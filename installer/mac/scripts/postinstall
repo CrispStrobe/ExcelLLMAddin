@@ -1,0 +1,23 @@
+#!/bin/bash
+# Runs as root at install time. Copies the bundled manifest into the logged-in
+# user's Excel sideload folder (wef), so the add-in appears in Excel. The add-in
+# itself loads from its hosted HTTPS origin — this installs only the manifest.
+set -e
+
+PAYLOAD="/usr/local/share/excel-llm-addin/manifest.xml"
+
+# The pkg runs as root; find the actual console (logged-in) user + their home.
+CONSOLE_USER="$(stat -f%Su /dev/console)"
+if [ -z "$CONSOLE_USER" ] || [ "$CONSOLE_USER" = "root" ]; then
+  # Fall back to the invoking user if we can't read the console user.
+  CONSOLE_USER="${USER:-$(whoami)}"
+fi
+USER_HOME="$(dscl . -read "/Users/$CONSOLE_USER" NFSHomeDirectory 2>/dev/null | awk '{print $2}')"
+[ -z "$USER_HOME" ] && USER_HOME="/Users/$CONSOLE_USER"
+
+WEF="$USER_HOME/Library/Containers/com.microsoft.Excel/Data/Documents/wef"
+mkdir -p "$WEF"
+cp "$PAYLOAD" "$WEF/excel-llm-addin.manifest.xml"
+chown "$CONSOLE_USER" "$WEF/excel-llm-addin.manifest.xml"
+
+exit 0

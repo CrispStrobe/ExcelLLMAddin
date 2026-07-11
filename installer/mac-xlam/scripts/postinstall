@@ -1,0 +1,22 @@
+#!/bin/bash
+# Copies the bundled .xlam into the logged-in user's Excel-for-Mac add-ins folder.
+# The .xlam is fully self-contained (VBA) and works offline. After install, enable
+# it once in Excel: Tools > Excel Add-ins > check "ExcelLLMAddin" (or double-click
+# the .xlam). Runs as root at install time.
+set -e
+
+PAYLOAD="/usr/local/share/excel-llm-addin/ExcelLLMAddin.xlam"
+
+CONSOLE_USER="$(stat -f%Su /dev/console)"
+if [ -z "$CONSOLE_USER" ] || [ "$CONSOLE_USER" = "root" ]; then
+  CONSOLE_USER="${USER:-$(whoami)}"
+fi
+USER_HOME="$(dscl . -read "/Users/$CONSOLE_USER" NFSHomeDirectory 2>/dev/null | awk '{print $2}')"
+[ -z "$USER_HOME" ] && USER_HOME="/Users/$CONSOLE_USER"
+
+DEST="$USER_HOME/Library/Group Containers/UBF8T346G9.Office/User Content/Add-Ins"
+mkdir -p "$DEST"
+cp "$PAYLOAD" "$DEST/ExcelLLMAddin.xlam"
+chown "$CONSOLE_USER" "$DEST/ExcelLLMAddin.xlam"
+
+exit 0
