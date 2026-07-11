@@ -37,7 +37,9 @@ temp files, and none of the encoding pain of the legacy `.xlam`.
 - `=LLM.LIST_MODELS([provider])` — spill available models
 - `=LLM.CONFIG()` — show the active provider/model
 - **Agent** — describe an edit in plain English; the model reads/writes ranges, formulas, and formatting on your sheet via tool-calling (extensible with remote MCP servers)
-- A task pane (Home ▸ **LLM Settings**) to pick provider, model, key, or proxy
+- A task pane (Home ▸ **LLM Settings**) to pick provider, model, key, or proxy —
+  with a **token-usage meter** (running session tokens, in/out, calls) and a
+  one-click **prompt library** for the agent
 - Providers: OpenAI, Mistral, Nebius, Scaleway, OpenRouter, Groq, Together AI, Cerebras, Google Gemini, Cohere, Hugging Face, Requesty, Ollama (local)
 
 To ship it to users (hosting, org deployment, AppSource), see **[PUBLISHING.md](PUBLISHING.md)**.
@@ -119,6 +121,8 @@ the cross-platform CI gate. What's covered, all without Excel or a network:
   matrices, formatting).
 - **MCP** (`mcp.ts`): JSON-RPC build + plain-JSON/SSE response parsing.
 - **Config** (`config.ts`): settings persistence over a faked `OfficeRuntime.storage`.
+- **Usage** (`usage.ts`): token-usage parsing (OpenAI + Ollama shapes) and the
+  running session tracker behind the task-pane meter.
 
 ### Live provider tests (real network, opt-in)
 

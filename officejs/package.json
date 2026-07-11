@@ -16,7 +16,8 @@
     "stop": "office-addin-debugging stop manifest.xml",
     "validate": "office-addin-manifest validate manifest.xml",
     "typecheck": "tsc --noEmit",
-    "harness:smoke": "node tools/drive-harness.cjs"
+    "harness:smoke": "node tools/drive-harness.cjs",
+    "check:ui": "node tools/check-ui.cjs"
   },
   "dependencies": {
     "core-js": "^3.36.0"
