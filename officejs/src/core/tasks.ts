@@ -1,7 +1,10 @@
 // Higher-level LLM operations built on runPrompt. Each sets a task-specific
 // system prompt and post-processes the reply. Pure + testable (fetch injected).
 
-import { runPrompt, embed, visionPrompt, LlmSettings, Deps } from "./llm";
+import { runPrompt, embed, embedBatch, visionPrompt, LlmSettings, Deps } from "./llm";
+
+/** Max texts per embedding request; large ranges are split into several calls. */
+const EMBED_BATCH_SIZE = 96;
 
 function withSystem(settings: LlmSettings, system: string): LlmSettings {
   return { ...settings, systemPrompt: system };
@@ -315,11 +318,47 @@ export async function similarity(
   settings: LlmSettings,
   deps: Deps
 ): Promise<number> {
-  const [va, vb] = await Promise.all([
-    embed(a, model, settings, deps),
-    embed(b, model, settings, deps),
-  ]);
+  // One batched request instead of two round-trips (openai-style; ollama still
+  // falls back to singles inside embedBatch).
+  const [va, vb] = await embedBatch([a, b], model, settings, deps);
   return cosine(va, vb);
+}
+
+/**
+ * Embed every text, batching into few requests. A batch that fails (bad model,
+ * a transient error) falls back to per-item embedding for just that batch, so
+ * one bad row can't sink the whole set; an item that still fails becomes null.
+ */
+async function embedEach(
+  texts: string[],
+  model: string,
+  settings: LlmSettings,
+  deps: Deps
+): Promise<Array<number[] | null>> {
+  const out: Array<number[] | null> = new Array(texts.length).fill(null);
+  const chunks: Array<{ start: number; texts: string[] }> = [];
+  for (let i = 0; i < texts.length; i += EMBED_BATCH_SIZE) {
+    chunks.push({ start: i, texts: texts.slice(i, i + EMBED_BATCH_SIZE) });
+  }
+  // A few batches in flight at once; each batch is already one HTTP request.
+  await runPool(chunks, 4, async (chunk) => {
+    try {
+      const vecs = await embedBatch(chunk.texts, model, settings, deps);
+      vecs.forEach((v, j) => (out[chunk.start + j] = v));
+    } catch {
+      // Whole-batch failure → reliable per-item calls for this chunk only.
+      await Promise.all(
+        chunk.texts.map(async (t, j) => {
+          try {
+            out[chunk.start + j] = await embed(t, model, settings, deps);
+          } catch {
+            out[chunk.start + j] = null;
+          }
+        })
+      );
+    }
+  });
+  return out;
 }
 
 /**
@@ -338,21 +377,12 @@ export async function recall(
   const cands = candidates.map((c) => String(c)).filter((c) => c.trim() !== "");
   if (cands.length === 0) return [];
   const qVec = await embed(query, model, settings, deps); // throws if no model
-  // Bound concurrency: a large range would otherwise fire hundreds of simultaneous
-  // embedding requests and trip provider rate limits. A failed embed sinks to the
-  // bottom rather than failing the whole search.
-  const scored: Array<[string, number]> = new Array(cands.length);
-  await runPool(
-    cands.map((c, i) => ({ c, i })),
-    8,
-    async ({ c, i }) => {
-      try {
-        scored[i] = [c, cosine(qVec, await embed(c, model, settings, deps))];
-      } catch {
-        scored[i] = [c, -1];
-      }
-    }
-  );
+  // Batch the candidate embeddings (was one HTTP request per row): a 200-row
+  // range now costs ~3 requests instead of 200, cutting latency and rate-limit
+  // pressure. A row whose embedding fails sinks to the bottom (score -1) rather
+  // than failing the whole search.
+  const vecs = await embedEach(cands, model, settings, deps);
+  const scored: Array<[string, number]> = cands.map((c, i) => [c, vecs[i] ? cosine(qVec, vecs[i]!) : -1]);
   scored.sort((a, b) => b[1] - a[1]);
   const top = k && k > 0 ? scored.slice(0, k) : scored;
   return top.map(([t, s]) => [t, Math.round(s * 1000) / 1000]);

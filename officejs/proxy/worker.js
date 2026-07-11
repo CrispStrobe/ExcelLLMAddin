@@ -15,7 +15,9 @@
 
 const ALLOWED_ORIGIN = "*"; // tighten to your add-in origin in production
 
+// Provider table generated from shared/providers.json (npm run gen:providers).
 const PROVIDERS = {
+  // <providers:generated>
   openai: { baseUrl: "https://api.openai.com/v1", style: "openai", keyEnv: "OPENAI_API_KEY" },
   mistral: { baseUrl: "https://api.mistral.ai/v1", style: "openai", keyEnv: "MISTRAL_API_KEY" },
   nebius: { baseUrl: "https://api.studio.nebius.com/v1", style: "openai", keyEnv: "NEBIUS_API_KEY" },
@@ -29,6 +31,7 @@ const PROVIDERS = {
   huggingface: { baseUrl: "https://router.huggingface.co/v1", style: "openai", keyEnv: "HF_TOKEN" },
   requesty: { baseUrl: "https://router.requesty.ai/v1", style: "openai", keyEnv: "REQUESTY_API_KEY" },
   ollama: { baseUrl: "http://localhost:11434", style: "ollama", keyEnv: null },
+  // </providers:generated>
 };
 
 const SYSTEM_DEFAULT =
@@ -112,6 +115,42 @@ export default {
     try {
       if (req.op === "embed") {
         const url = spec.style === "ollama" ? `${baseUrl}/api/embeddings` : `${baseUrl}/embeddings`;
+        // Batch path: `inputs` is an array → return `embeddings: number[][]` in
+        // order. Single path keeps `prompt` → `embedding`. Ollama has no array
+        // shape here, so batch requests fan out to sequential single calls.
+        if (Array.isArray(req.inputs)) {
+          if (spec.style === "ollama") {
+            const embeddings = [];
+            for (const t of req.inputs) {
+              const r = await fetch(url, {
+                method: "POST",
+                headers,
+                body: JSON.stringify({ model: req.model, prompt: t }),
+              });
+              const data = await r.json();
+              if (data.error) return json({ error: errMsg(data.error) }, r.status || 502);
+              const emb = data.embedding ?? (data.embeddings && data.embeddings[0]);
+              if (!Array.isArray(emb)) return json({ error: "No embedding in provider response" }, 502);
+              embeddings.push(emb);
+            }
+            return json({ embeddings });
+          }
+          const r = await fetch(url, {
+            method: "POST",
+            headers,
+            body: JSON.stringify({ model: req.model, input: req.inputs }),
+          });
+          const data = await r.json();
+          if (data.error) return json({ error: errMsg(data.error) }, r.status || 502);
+          const rows = data.data;
+          if (!Array.isArray(rows)) return json({ error: "No embeddings in provider response" }, 502);
+          const ordered = rows.every((x) => typeof x?.index === "number")
+            ? [...rows].sort((a, b) => a.index - b.index)
+            : rows;
+          const embeddings = ordered.map((x) => x.embedding);
+          if (embeddings.some((e) => !Array.isArray(e))) return json({ error: "Malformed embeddings row" }, 502);
+          return json({ embeddings });
+        }
         const body =
           spec.style === "ollama" ? { model: req.model, prompt: req.prompt } : { model: req.model, input: req.prompt };
         const r = await fetch(url, { method: "POST", headers, body: JSON.stringify(body) });

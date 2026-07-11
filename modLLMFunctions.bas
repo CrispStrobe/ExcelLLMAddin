@@ -167,6 +167,76 @@ Fail:
     Set EmbedVector = Nothing
 End Function
 
+' Batch embeddings for openai-style providers: ONE /embeddings call for many
+' texts (JSON `input` array) instead of one request per text -- the RECALL hot
+' path. Returns a Collection of vectors (each a Collection of Doubles) aligned to
+' `texts`, or Nothing if the provider isn't openai-style (Ollama has no array
+' shape here) or the call/parse fails -- in which case the caller falls back to
+' per-item EmbedVector so behavior is never worse than before.
+Public Function EmbedVectorsBatch(texts As Collection, embModel As String, Optional provider As String = "") As Object
+    On Error GoTo Fail
+
+    EnsureConfig
+    If provider = "" Then provider = CurrentProvider
+    provider = LCase(Trim(provider))
+    If embModel = "" Then Set EmbedVectorsBatch = Nothing: Exit Function
+    If provider = "ollama" Then Set EmbedVectorsBatch = Nothing: Exit Function
+    If texts Is Nothing Then Set EmbedVectorsBatch = Nothing: Exit Function
+    If texts.Count = 0 Then Set EmbedVectorsBatch = New Collection: Exit Function
+
+    Dim baseURL As String, apiKey As String, response As String
+    baseURL = GetBaseURL(provider)
+    apiKey = GetAPIKey(provider)
+    If baseURL = "" Then Set EmbedVectorsBatch = Nothing: Exit Function
+    If apiKey = "" Then Set EmbedVectorsBatch = Nothing: Exit Function
+
+    ' Build { model, input: [texts...] }. A Collection serializes to a JSON array.
+    Dim inputArr As Collection, i As Long
+    Set inputArr = New Collection
+    For i = 1 To texts.Count
+        inputArr.Add CStr(texts(i))
+    Next i
+    Dim body As Object
+    Set body = New Dictionary
+    body.Add "model", embModel
+    body.Add "input", inputArr
+
+    Dim client As IHttpClient
+    Set client = modHttp.CreateHttpClient()
+    response = client.PostJson(baseURL & "/embeddings", JsonConverter.ConvertToJson(body), apiKey, provider)
+    If Left$(response, 6) = "Error:" Then Set EmbedVectorsBatch = Nothing: Exit Function
+
+    Dim root As Object, data As Object, row As Object
+    Set root = JsonConverter.ParseJson(response)
+    If Not root.Exists("data") Then Set EmbedVectorsBatch = Nothing: Exit Function
+    Set data = root("data")
+    If data.Count <> texts.Count Then Set EmbedVectorsBatch = Nothing: Exit Function
+
+    ' Place each row by its (0-based) `index` when present, else in arrival order,
+    ' so a reordered response still lines up with the inputs.
+    Dim slots() As Object, idx As Long
+    ReDim slots(1 To texts.Count)
+    For i = 1 To data.Count
+        Set row = data(i)
+        If Not row.Exists("embedding") Then Set EmbedVectorsBatch = Nothing: Exit Function
+        idx = i
+        If row.Exists("index") Then idx = CLng(row("index")) + 1
+        If idx < 1 Or idx > texts.Count Then idx = i
+        Set slots(idx) = row("embedding")
+    Next i
+
+    Dim result As Collection
+    Set result = New Collection
+    For i = 1 To texts.Count
+        If slots(i) Is Nothing Then Set EmbedVectorsBatch = Nothing: Exit Function
+        result.Add slots(i)
+    Next i
+    Set EmbedVectorsBatch = result
+    Exit Function
+Fail:
+    Set EmbedVectorsBatch = Nothing
+End Function
+
 ' =LIST_MODELS([provider]) -> newline-separated model ids.
 Public Function LIST_MODELS(Optional provider As String = "") As String
     On Error GoTo ErrorHandler

@@ -4,6 +4,7 @@
 
 import {
   embed,
+  embedBatch,
   listModels,
   directHeaders,
   extractChatContent,
@@ -95,6 +96,54 @@ describe("embed", () => {
       const { deps } = mockFetch(`{"content":"oops"}`);
       await expect(embed("hi", "m", proxied, deps)).rejects.toThrow(/no embedding/i);
     });
+  });
+});
+
+describe("embedBatch", () => {
+  test("openai sends one {input:[...]} request and returns vectors in order", async () => {
+    const { deps, calls } = mockFetch(
+      `{"data":[{"embedding":[3,3],"index":1},{"embedding":[1,1],"index":0}]}`
+    );
+    const vecs = await embedBatch(["a", "b"], "m", openai, deps);
+    // Rows arrive out of order but carry index → re-sorted to input order.
+    expect(vecs).toEqual([[1, 1], [3, 3]]);
+    expect(calls.length).toBe(1);
+    expect(JSON.parse(calls[0].init.body)).toMatchObject({ model: "m", input: ["a", "b"] });
+  });
+
+  test("returns [] for no texts without fetching", async () => {
+    const { deps, calls } = mockFetch(`{}`);
+    expect(await embedBatch([], "m", openai, deps)).toEqual([]);
+    expect(calls.length).toBe(0);
+  });
+
+  test("throws when the provider returns the wrong number of rows", async () => {
+    const { deps } = mockFetch(`{"data":[{"embedding":[1]}]}`); // asked for 2
+    await expect(embedBatch(["a", "b"], "m", openai, deps)).rejects.toThrow(/mismatch/i);
+  });
+
+  test("ollama falls back to one request per text", async () => {
+    const { deps, calls } = mockFetch(`{"embedding":[9]}`);
+    const vecs = await embedBatch(["a", "b", "c"], "nomic", ollama, deps);
+    expect(vecs).toEqual([[9], [9], [9]]);
+    expect(calls.length).toBe(3);
+  });
+
+  test("serves cached texts and only requests the misses", async () => {
+    const { deps, calls } = mockFetch(`{"data":[{"embedding":[2,2]}]}`);
+    const cached = { ...deps, cache: createLruCache() };
+    await embedBatch(["x"], "m", openai, cached); // warms cache for "x" (1 request)
+    const vecs = await embedBatch(["x", "y"], "m", openai, cached); // only "y" is fetched
+    expect(vecs).toEqual([[2, 2], [2, 2]]);
+    const bodies = calls.map((c) => JSON.parse(c.init.body).input);
+    expect(bodies).toEqual([["x"], ["y"]]); // second call omits the cache hit
+  });
+
+  test("proxy sends {op:'embed', inputs} and reads {embeddings}", async () => {
+    const { deps, calls } = mockFetch(`{"embeddings":[[1],[2]]}`);
+    const proxied: LlmSettings = { provider: "openai", model: "m", proxyUrl: "https://proxy.example/api" };
+    expect(await embedBatch(["a", "b"], "m", proxied, deps)).toEqual([[1], [2]]);
+    expect(JSON.parse(calls[0].init.body)).toMatchObject({ op: "embed", inputs: ["a", "b"] });
   });
 });
 

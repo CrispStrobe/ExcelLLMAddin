@@ -82,6 +82,7 @@ Public Function RunAllTests(Optional ByVal showUI As Boolean = True) As Long
     Test_Task_Recall
     Test_Task_Cosine
     Test_Task_Embed
+    Test_Task_EmbedBatch
 
     ' --- agent (modAgent) ---
     Test_Agent_Tools
@@ -465,6 +466,31 @@ Private Sub Test_Task_Embed()
         AssertEqual "task/embed vector length", "3", CStr(v.Count)
         AssertEqual "task/embed vector value", "2", CStr(v(2))
     End If
+End Sub
+
+Private Sub Test_Task_EmbedBatch()
+    ' One /embeddings call returns a row per input; rows carry `index` and here
+    ' arrive out of order, so the result must be re-aligned to input order.
+    Dim mock As MockHttpClient
+    Set mock = InstallMock("{""data"":[{""embedding"":[9.0],""index"":1},{""embedding"":[1.0],""index"":0}]}")
+
+    Dim texts As New Collection
+    texts.Add "a": texts.Add "b"
+    Dim vecs As Object
+    Set vecs = EmbedVectorsBatch(texts, "some-model", "openai")
+
+    If vecs Is Nothing Then
+        AssertEqual "task/embedBatch returns vectors", "2", "(nothing)"
+    Else
+        AssertEqual "task/embedBatch count", "2", CStr(vecs.Count)
+        AssertEqual "task/embedBatch reorders by index (a)", "1", CStr(vecs(1)(1))
+        AssertEqual "task/embedBatch reorders by index (b)", "9", CStr(vecs(2)(1))
+    End If
+    ' The whole batch was a single HTTP request.
+    AssertEqual "task/embedBatch one HTTP call", "1", CStr(mock.CallCount)
+
+    ' Ollama has no array-input endpoint -> returns Nothing (caller falls back).
+    AssertTrue "task/embedBatch ollama falls back", (EmbedVectorsBatch(texts, "m", "ollama") Is Nothing)
 End Sub
 
 Private Sub Test_Agent_Tools()

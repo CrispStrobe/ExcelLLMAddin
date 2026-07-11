@@ -139,6 +139,29 @@ describe("similarity / cosine", () => {
     expect(out[1][0]).toBe("c3"); // 0.99 beats c2's 0
   });
 
+  test("recall batches all candidate embeddings into one request (openai)", async () => {
+    // openai-style provider → embedBatch sends a single {input:[...]} call for the
+    // candidates (plus one for the query), instead of one request per row.
+    const calls: Array<any> = [];
+    const fetch: FetchLike = async (_url, init) => {
+      const body = JSON.parse(String(init?.body ?? "{}"));
+      calls.push(body);
+      const inputs = Array.isArray(body.input) ? body.input : [body.input];
+      const vecFor = (t: string) => (t === "q" || t === "c1" ? [1, 0, 0] : [0, 1, 0]);
+      return {
+        ok: true,
+        status: 200,
+        text: async () => JSON.stringify({ data: inputs.map((t: string, i: number) => ({ embedding: vecFor(t), index: i })) }),
+      };
+    };
+    const oai: LlmSettings = { provider: "openai", model: "m", apiKey: "k" };
+    const out = await recall("q", ["c1", "c2", "c3"], 2, "m", oai, { fetch });
+    expect(out[0][0]).toBe("c1");
+    // 2 HTTP calls total: 1 for the query, 1 batched for all 3 candidates.
+    expect(calls.length).toBe(2);
+    expect(calls.some((b) => Array.isArray(b.input) && b.input.length === 3)).toBe(true);
+  });
+
   test("recall drops blank candidates and returns [] on none", async () => {
     const { deps } = embedMock([[1]]);
     expect(await recall("q", ["", "   "], 3, "m", settings, deps)).toEqual([]);
@@ -150,11 +173,13 @@ describe("similarity / cosine", () => {
   });
 
   test("recall tolerates a failed candidate embed (it sinks to the bottom)", async () => {
-    // Query + good candidate succeed; the bad candidate's embed returns an error.
-    let n = 0;
-    const fetch: FetchLike = async () => {
-      n++;
-      if (n === 3) return { ok: false, status: 500, text: async () => `{"error":"boom"}` }; // 2nd candidate
+    // Any request whose body mentions "bad" fails; everything else succeeds.
+    // Keyed on content (not call order) so it holds regardless of batching: the
+    // failed batch falls back to per-item, and only "bad" ends up unscored.
+    const fetch: FetchLike = async (_url, init) => {
+      if (String(init?.body ?? "").includes("bad")) {
+        return { ok: false, status: 500, text: async () => `{"error":"boom"}` };
+      }
       return {
         ok: true,
         status: 200,

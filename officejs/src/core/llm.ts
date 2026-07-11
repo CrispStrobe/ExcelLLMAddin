@@ -244,6 +244,97 @@ export async function embed(
   return vec;
 }
 
+function embedCacheKey(settings: LlmSettings, model: string, text: string): string {
+  return JSON.stringify(["embed", settings.provider, model, text]);
+}
+
+/**
+ * Embed many texts, preferring ONE request over N. OpenAI-style embedding
+ * endpoints accept an `input` array and return `data[i].embedding`, so a whole
+ * range collapses to a single call (or a few, if the caller chunks). Ollama has
+ * no array-input shape in the endpoint we use, so it falls back to cache-aware
+ * single calls. The per-text cache is honored: only cache misses are requested,
+ * and results are written back, so this stays consistent with embed().
+ */
+export async function embedBatch(
+  texts: string[],
+  model: string,
+  settings: LlmSettings,
+  deps: Deps
+): Promise<number[][]> {
+  const spec = requireProvider(settings.provider);
+  if (!model) {
+    throw new LlmError("No embedding model set — pass one to SIMILARITY or set it in LLM Settings.");
+  }
+  if (texts.length === 0) return [];
+
+  // Serve per-text cache hits; collect the indices that still need a request.
+  const out: number[][] = new Array(texts.length);
+  const missIdx: number[] = [];
+  for (let i = 0; i < texts.length; i++) {
+    const hit = deps.cache ? deps.cache.get(embedCacheKey(settings, model, texts[i])) : undefined;
+    if (hit !== undefined) out[i] = JSON.parse(hit) as number[];
+    else missIdx.push(i);
+  }
+  if (missIdx.length === 0) return out;
+
+  // Ollama: no array-input endpoint here, so embed the misses one by one
+  // (embed() is itself cache-aware, so this also fills the cache).
+  if (spec.style === "ollama" && !settings.proxyUrl) {
+    for (const i of missIdx) out[i] = await embed(texts[i], model, settings, deps);
+    return out;
+  }
+
+  const missTexts = missIdx.map((i) => texts[i]);
+  let vecs: number[][];
+  if (settings.proxyUrl) {
+    const data = await callProxy("embed", "", { ...settings, model }, spec, deps, { inputs: missTexts });
+    if (!Array.isArray(data.embeddings)) throw new LlmError("Proxy returned no embeddings.");
+    vecs = (data.embeddings as unknown[]).map((v) => (v as unknown[]).map(Number));
+  } else {
+    const baseUrl = settings.baseUrl || spec.defaultBaseUrl;
+    if (spec.requiresKey && !settings.apiKey) {
+      throw new LlmError(`No API key configured for ${spec.label}.`);
+    }
+    const url = embeddingsEndpoint(spec, baseUrl);
+    const resp = await deps.fetch(url, {
+      method: "POST",
+      headers: directHeaders(spec, settings.apiKey),
+      body: JSON.stringify({ model, input: missTexts }),
+    });
+    const t = await resp.text();
+    if (!resp.ok) throw new LlmError(parseErrorMessage(t) ?? `HTTP ${resp.status} from ${url}`);
+    vecs = extractEmbeddingList(t, missTexts.length);
+  }
+
+  if (vecs.length !== missTexts.length) {
+    throw new LlmError(`Embedding count mismatch: asked for ${missTexts.length}, got ${vecs.length}.`);
+  }
+  for (let k = 0; k < missIdx.length; k++) {
+    out[missIdx[k]] = vecs[k];
+    if (deps.cache) deps.cache.set(embedCacheKey(settings, model, missTexts[k]), JSON.stringify(vecs[k]));
+  }
+  return out;
+}
+
+/** Parse an OpenAI-style batch embeddings body into vectors, ordered by index. */
+function extractEmbeddingList(text: string, expected: number): number[][] {
+  const data = safeJson(text);
+  if (data && (data as any).error) throw new LlmError(errorMessage((data as any).error));
+  const rows = (data as any)?.data;
+  if (!Array.isArray(rows)) throw new LlmError("No embeddings found in response.");
+  // Providers return the rows in request order but also carry an explicit
+  // `index`; honor it when present so a reordered response still lines up.
+  const ordered = rows.every((r: any) => typeof r?.index === "number")
+    ? [...rows].sort((a: any, b: any) => a.index - b.index)
+    : rows;
+  const vecs = ordered.map((r: any) => {
+    if (!Array.isArray(r?.embedding)) throw new LlmError("No embedding found in a response row.");
+    return (r.embedding as unknown[]).map(Number);
+  });
+  return vecs;
+}
+
 function extractEmbedding(text: string): number[] {
   const data = safeJson(text);
   if (data && (data as any).error) throw new LlmError(errorMessage((data as any).error));
@@ -326,7 +417,8 @@ async function callProxy(
   prompt: string,
   settings: LlmSettings,
   spec: ProviderSpec,
-  deps: Deps
+  deps: Deps,
+  extra?: Record<string, unknown>
 ): Promise<any> {
   const resp = await deps.fetch(settings.proxyUrl!, {
     method: "POST",
@@ -338,6 +430,7 @@ async function callProxy(
       prompt,
       system: settings.systemPrompt,
       baseUrl: settings.baseUrl,
+      ...extra,
     }),
   });
   const text = await resp.text();

@@ -483,10 +483,20 @@ Public Function RECALL(query As String, candidates As Variant, Optional k As Lon
     Dim scores() As Double, keep() As String
     ReDim scores(1 To n)
     ReDim keep(1 To n)
+
+    ' Embed all candidates in ONE request when the provider supports it (was one
+    ' request per row -- a 200-row range now costs ~1 call instead of 200). Falls
+    ' back to per-item embedding for Ollama or if the batch call fails.
+    Dim vecs As Object
+    Set vecs = EmbedVectorsBatch(texts, embModel, provider)
     For i = 1 To n
         keep(i) = texts(i)
         Dim cv As Object
-        Set cv = EmbedVector(texts(i), embModel, provider)
+        If vecs Is Nothing Then
+            Set cv = EmbedVector(texts(i), embModel, provider)
+        Else
+            Set cv = vecs(i)
+        End If
         If cv Is Nothing Then scores(i) = -1 Else scores(i) = Cosine(qv, cv)
     Next i
 
