@@ -290,6 +290,65 @@ End Function
 
 ' Build a chat-completions request body with a real serializer so prompt text
 ' (quotes, backslashes, newlines, unicode) is always escaped correctly.
+' Multimodal chat: ask a question about an image (OpenAI-compatible content array).
+' Direct providers only; Ollama uses a different image format so it is rejected.
+Public Function ChatCompleteVision(question As String, imageUrl As String, _
+                                   Optional provider As String = "", Optional model As String = "") As String
+    On Error GoTo ErrorHandler
+    EnsureConfig
+    If provider = "" Then provider = CurrentProvider
+    If model = "" Then model = CurrentModel
+    provider = LCase(Trim(provider))
+
+    If provider = "ollama" Then
+        ChatCompleteVision = "Error: VISION isn't supported for Ollama (different image format)"
+        Exit Function
+    End If
+
+    Dim baseURL As String, apiKey As String
+    baseURL = GetBaseURL(provider)
+    apiKey = GetAPIKey(provider)
+    If baseURL = "" Then ChatCompleteVision = "Error: Invalid provider '" & provider & "'": Exit Function
+    If apiKey = "" Then ChatCompleteVision = "Error: No API key for " & provider: Exit Function
+
+    ' Build the multimodal message: content = [ {type:text}, {type:image_url} ].
+    Dim root As Object, messages As Object, um As Object, content As Object
+    Dim txt As Object, img As Object, imgUrl As Object
+    Set root = New Dictionary
+    root.Add "model", model
+    Set messages = New Collection
+
+    Set um = New Dictionary
+    um.Add "role", "user"
+    Set content = New Collection
+    Set txt = New Dictionary
+    txt.Add "type", "text": txt.Add "text", question
+    content.Add txt
+    Set img = New Dictionary
+    img.Add "type", "image_url"
+    Set imgUrl = New Dictionary
+    imgUrl.Add "url", imageUrl
+    img.Add "image_url", imgUrl
+    content.Add img
+    um.Add "content", content
+    messages.Add um
+    root.Add "messages", messages
+
+    Dim jsonBody As String
+    jsonBody = JsonConverter.ConvertToJson(root)
+
+    Dim client As IHttpClient
+    Set client = modHttp.CreateHttpClient()
+    Dim response As String
+    response = client.PostJson(baseURL & "/chat/completions", jsonBody, apiKey, provider)
+    If Left$(response, 6) = "Error:" Then ChatCompleteVision = response: Exit Function
+
+    ChatCompleteVision = ExtractChatContent(response, provider)
+    Exit Function
+ErrorHandler:
+    ChatCompleteVision = "Error: " & Err.Number & " - " & Err.Description
+End Function
+
 Private Function BuildChatBody(ByVal model As String, ByVal systemMsg As String, _
                                ByVal userMsg As String, ByVal provider As String) As String
     Dim root As Object, messages As Object, m As Object

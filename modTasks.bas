@@ -225,6 +225,19 @@ Fail:
     FILL = "Error: " & Err.Description
 End Function
 
+' =VISION(image, [question], ...) -> answer about an image (URL or data: URI).
+' Needs a vision-capable model on a direct (non-Ollama) provider.
+Public Function VISION(image As String, Optional question As String = "", _
+                       Optional provider As String = "", Optional model As String = "") As String
+    Dim img As String
+    img = Trim$(image)
+    If img = "" Then VISION = "Error: no image URL or data: URI provided": Exit Function
+    Dim q As String
+    q = Trim$(question)
+    If q = "" Then q = "Describe this image."
+    VISION = TrimResult(ChatCompleteVision(q, img, provider, model))
+End Function
+
 ' =ASK(question, context, ...) -> answer using the context range/text.
 Public Function ASK(question As String, context As Variant, Optional provider As String = "", Optional model As String = "") As String
     Dim ctx As String

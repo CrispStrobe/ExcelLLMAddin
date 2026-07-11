@@ -77,6 +77,7 @@ Public Function RunAllTests(Optional ByVal showUI As Boolean = True) As Long
     Test_Task_Formula
     Test_Task_Table
     Test_Task_Fill
+    Test_Task_Vision
     Test_Task_Recall
     Test_Task_Cosine
     Test_Task_Embed
@@ -407,6 +408,17 @@ Private Sub Test_Task_Fill()
     r = FILL(ex, ins, "ollama", "test-model")
     AssertEqual "task/fill FR", "FR", CStr(r(1, 1))
     AssertEqual "task/fill ES", "ES", CStr(r(2, 1))
+End Sub
+
+Private Sub Test_Task_Vision()
+    ' Exercises the multimodal body builder against the mock client.
+    Dim mock As MockHttpClient
+    Set mock = InstallMock("{""choices"":[{""message"":{""content"":""A cat.""}}]}")
+    Dim out As String
+    out = VISION("https://x/cat.png", "what is it?", "openai", "gpt-4o")
+    AssertEqual "task/vision content", "A cat.", out
+    AssertTrue "task/vision body has image_url", (InStr(mock.LastBody, "image_url") > 0)
+    AssertTrue "task/vision body carries the url", (InStr(mock.LastBody, "https://x/cat.png") > 0)
 End Sub
 
 Private Sub Test_Task_Recall()

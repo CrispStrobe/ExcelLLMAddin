@@ -105,7 +105,7 @@ no hosting, no web server. It has near-parity with the Office.js edition:
 
 - Functions: `=PROMPT`, `=CLASSIFY`, `=EXTRACT`, `=TRANSLATE`, `=SUMMARIZE`,
   `=SENTIMENT`, `=ASK`, `=LIST`, `=FIELDS`, `=MAP`, `=SIMILARITY`, `=RECALL`, `=TAG`, `=EDIT`,
-  `=FORMULA`, `=EXPLAIN`, `=LLMTABLE`, `=FILL`, `=LIST_MODELS`, `=LLM_CONFIG`
+  `=FORMULA`, `=EXPLAIN`, `=LLMTABLE`, `=FILL`, `=VISION`, `=LIST_MODELS`, `=LLM_CONFIG`
   (`modLLMFunctions.bas`, `modTasks.bas`). (`LLMTABLE` is the Office.js `TABLE`,
   renamed to avoid Excel's legacy Data-Table function.)
 - **Agent** (`modAgent.bas`) — run the `RunAgent` macro; the model edits the sheet
@@ -119,8 +119,7 @@ no hosting, no web server. It has near-parity with the Office.js edition:
   menu's **C** option (they share one OpenAI-compatible code path).
 - Solid plumbing: injected `IHttpClient` (WinHTTP/curl), real JSON (vendored
   VBA-JSON), UTF-8, a response cache, and a `RunAllTests` self-test harness.
-- Office.js-only for now: `STREAM` (VBA UDFs are synchronous), `VISION` (multimodal
-  body), and the agent's `create_chart` tool.
+- Office.js-only for now: `STREAM` (VBA UDFs are synchronous) and the agent's `create_chart` tool.
 
 **Build:** `pwsh tools/Build-Addin.ps1` on Windows+Excel, or import the modules in
 the VBA editor and Save As `.xlam` (Excel is required to compile VBA — it can't be
