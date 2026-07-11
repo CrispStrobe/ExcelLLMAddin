@@ -78,23 +78,23 @@ Public Sub LoadConfig()
     Dim parts() As String
     Dim lineNum As Integer
     
-    Debug.Print "[Config] === LoadConfig START ==="
+    If DEBUG_MODE Then Debug.Print "[Config] === LoadConfig START ==="
     
     ' Initialize defaults FIRST
     Call InitializeDefaults
-    Debug.Print "[Config] Defaults set: OLLAMA_BASE_URL='" & OLLAMA_BASE_URL & "'"
+    If DEBUG_MODE Then Debug.Print "[Config] Defaults set: OLLAMA_BASE_URL='" & OLLAMA_BASE_URL & "'"
     
     filePath = GetConfigLocation()
-    Debug.Print "[Config] Config path: " & filePath
+    If DEBUG_MODE Then Debug.Print "[Config] Config path: " & filePath
     
     ' Check if file exists
     If Dir(filePath) = "" Then
-        Debug.Print "[Config] No config file, creating with defaults"
+        If DEBUG_MODE Then Debug.Print "[Config] No config file, creating with defaults"
         Call SaveConfig
         Exit Sub
     End If
     
-    Debug.Print "[Config] File exists, reading..."
+    If DEBUG_MODE Then Debug.Print "[Config] File exists, reading..."
     
     On Error GoTo ErrorHandler
     
@@ -119,7 +119,7 @@ Public Sub LoadConfig()
                     
                     ' CRITICAL FIX: Only set if value is NOT empty
                     If value <> "" Then
-                        Debug.Print "[Config] Line " & lineNum & ": " & key & " = '" & Left(value, 30) & "'"
+                        If DEBUG_MODE Then Debug.Print "[Config] Line " & lineNum & ": " & key & " = '" & Left(value, 30) & "'"
                         
                         Select Case key
                             Case "OPENAI_API_KEY": OPENAI_API_KEY = value
@@ -134,12 +134,12 @@ Public Sub LoadConfig()
                             Case "OPENROUTER_URL": OPENROUTER_URL = value
                             Case "OLLAMA_BASE_URL"
                                 OLLAMA_BASE_URL = value
-                                Debug.Print "[Config]   *** SET OLLAMA_BASE_URL = '" & value & "'"
+                                If DEBUG_MODE Then Debug.Print "[Config]   *** SET OLLAMA_BASE_URL = '" & value & "'"
                             Case "CurrentProvider": CurrentProvider = value
                             Case "CurrentModel": CurrentModel = value
                         End Select
                     Else
-                        Debug.Print "[Config] Line " & lineNum & ": " & key & " = (empty, keeping default)"
+                        If DEBUG_MODE Then Debug.Print "[Config] Line " & lineNum & ": " & key & " = (empty, keeping default)"
                     End If
                 End If
             End If
@@ -148,14 +148,16 @@ Public Sub LoadConfig()
     
     Close #fileNum
     
-    Debug.Print "[Config] === LoadConfig COMPLETE ==="
-    Debug.Print "[Config] Final: Provider='" & CurrentProvider & "', Model='" & CurrentModel & "'"
-    Debug.Print "[Config] Final: OLLAMA_BASE_URL='" & OLLAMA_BASE_URL & "'"
+    If DEBUG_MODE Then
+        Debug.Print "[Config] === LoadConfig COMPLETE ==="
+        Debug.Print "[Config] Final: Provider='" & CurrentProvider & "', Model='" & CurrentModel & "'"
+        Debug.Print "[Config] Final: OLLAMA_BASE_URL='" & OLLAMA_BASE_URL & "'"
+    End If
     
     Exit Sub
     
 ErrorHandler:
-    Debug.Print "[Config] *** ERROR: " & Err.Number & " - " & Err.Description
+    If DEBUG_MODE Then Debug.Print "[Config] *** ERROR: " & Err.Number & " - " & Err.Description
     If fileNum > 0 Then Close #fileNum
     Call InitializeDefaults
 End Sub
@@ -166,9 +168,11 @@ Public Sub SaveConfig()
     Dim fileNum As Integer
     
     filePath = GetConfigLocation()
-    Debug.Print "[Config] === SaveConfig to: " & filePath
-    Debug.Print "[Config] Saving: Provider='" & CurrentProvider & "', Model='" & CurrentModel & "'"
-    Debug.Print "[Config] Saving: OLLAMA_BASE_URL='" & OLLAMA_BASE_URL & "'"
+    If DEBUG_MODE Then
+        Debug.Print "[Config] === SaveConfig to: " & filePath
+        Debug.Print "[Config] Saving: Provider='" & CurrentProvider & "', Model='" & CurrentModel & "'"
+        Debug.Print "[Config] Saving: OLLAMA_BASE_URL='" & OLLAMA_BASE_URL & "'"
+    End If
     
     On Error GoTo ErrorHandler
     
@@ -199,18 +203,18 @@ Public Sub SaveConfig()
     
     Close #fileNum
     
-    Debug.Print "[Config] *** Saved successfully"
+    If DEBUG_MODE Then Debug.Print "[Config] *** Saved successfully"
     Exit Sub
     
 ErrorHandler:
-    Debug.Print "[Config] *** SaveConfig ERROR: " & Err.Description
+    If DEBUG_MODE Then Debug.Print "[Config] *** SaveConfig ERROR: " & Err.Description
     If fileNum > 0 Then Close #fileNum
     MsgBox "Error saving config: " & Err.Description, vbExclamation
 End Sub
 
 ' Initialize default values
 Public Sub InitializeDefaults()
-    Debug.Print "[Config] --- InitializeDefaults ---"
+    If DEBUG_MODE Then Debug.Print "[Config] --- InitializeDefaults ---"
     
     ' URLs - ALWAYS set
     OPENAI_URL = "https://api.openai.com/v1"
@@ -224,7 +228,7 @@ Public Sub InitializeDefaults()
     If CurrentProvider = "" Then CurrentProvider = "ollama"
     If CurrentModel = "" Then CurrentModel = "ministral-3:3b-instruct-2512-q4_K_M"
     
-    Debug.Print "[Config] Defaults complete"
+    If DEBUG_MODE Then Debug.Print "[Config] Defaults complete"
 End Sub
 
 ' Get API key for provider
@@ -257,6 +261,3 @@ Public Function GetBaseURL(provider As String) As String
         Case Else: GetBaseURL = ""
     End Select
 End Function
-
-
-
