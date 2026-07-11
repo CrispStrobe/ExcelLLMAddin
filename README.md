@@ -81,7 +81,7 @@ Writes are queued for one-click **Apply** unless you opt into auto-apply.
 
 ## Providers
 
-OpenAI · Mistral · Nebius · Scaleway · OpenRouter · Ollama (local). OpenRouter,
+OpenAI · Mistral · Nebius · Scaleway · OpenRouter · Groq · Together · Cerebras · Google Gemini · Ollama (local). OpenRouter,
 Nebius, and local Ollama work directly from the browser; others use the optional
 key-custody proxy (`officejs/proxy/worker.js`).
 

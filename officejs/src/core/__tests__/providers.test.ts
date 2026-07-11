@@ -33,6 +33,15 @@ describe("endpoints", () => {
   test("tolerates a trailing slash on the base url", () => {
     expect(chatEndpoint(PROVIDERS.openai, "https://x.ai/v1/")).toBe("https://x.ai/v1/chat/completions");
   });
+
+  test("OpenAI-compat cloud providers use openai-style paths", () => {
+    for (const id of ["groq", "together", "cerebras", "gemini"]) {
+      const p = PROVIDERS[id];
+      expect(p.style).toBe("openai");
+      expect(chatEndpoint(p, p.defaultBaseUrl)).toBe(`${p.defaultBaseUrl}/chat/completions`);
+      expect(modelsEndpoint(p, p.defaultBaseUrl)).toBe(`${p.defaultBaseUrl}/models`);
+    }
+  });
 });
 
 describe("catalog invariants", () => {
@@ -44,6 +53,14 @@ describe("catalog invariants", () => {
   test("keys of the record match each spec id", () => {
     for (const [key, spec] of Object.entries(PROVIDERS)) {
       expect(spec.id).toBe(key);
+    }
+  });
+
+  test("cloud providers that block the browser are marked not browserFriendly", () => {
+    // These need the proxy; the UI keys its CORS hint off this flag.
+    for (const id of ["groq", "together", "cerebras", "gemini"]) {
+      expect(PROVIDERS[id].browserFriendly).toBe(false);
+      expect(PROVIDERS[id].requiresKey).toBe(true);
     }
   });
 });

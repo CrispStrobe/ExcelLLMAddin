@@ -40,6 +40,29 @@ export const PROVIDERS: Record<string, ProviderSpec> = {
     defaultBaseUrl: "https://openrouter.ai/api/v1",
     requiresKey: true, style: "openai", browserFriendly: true,
   },
+  groq: {
+    id: "groq", label: "Groq",
+    // OpenAI-compatible; very fast. Bearer auth. No embeddings endpoint.
+    defaultBaseUrl: "https://api.groq.com/openai/v1",
+    requiresKey: true, style: "openai", browserFriendly: false,
+  },
+  together: {
+    id: "together", label: "Together AI",
+    defaultBaseUrl: "https://api.together.xyz/v1",
+    requiresKey: true, style: "openai", browserFriendly: false,
+  },
+  cerebras: {
+    id: "cerebras", label: "Cerebras",
+    defaultBaseUrl: "https://api.cerebras.ai/v1",
+    requiresKey: true, style: "openai", browserFriendly: false,
+  },
+  gemini: {
+    id: "gemini", label: "Google Gemini",
+    // Google's OpenAI-compatible endpoint: /chat/completions, /models, /embeddings
+    // all normalized to OpenAI shapes, Bearer auth. CORS-blocked → proxy.
+    defaultBaseUrl: "https://generativelanguage.googleapis.com/v1beta/openai",
+    requiresKey: true, style: "openai", browserFriendly: false,
+  },
   ollama: {
     id: "ollama", label: "Ollama (local)",
     defaultBaseUrl: "http://localhost:11434",

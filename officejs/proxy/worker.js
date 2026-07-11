@@ -21,6 +21,10 @@ const PROVIDERS = {
   nebius: { baseUrl: "https://api.studio.nebius.com/v1", style: "openai", keyEnv: "NEBIUS_API_KEY" },
   scaleway: { baseUrl: "https://api.scaleway.ai/v1", style: "openai", keyEnv: "SCALEWAY_API_KEY" },
   openrouter: { baseUrl: "https://openrouter.ai/api/v1", style: "openai", keyEnv: "OPENROUTER_API_KEY" },
+  groq: { baseUrl: "https://api.groq.com/openai/v1", style: "openai", keyEnv: "GROQ_API_KEY" },
+  together: { baseUrl: "https://api.together.xyz/v1", style: "openai", keyEnv: "TOGETHER_API_KEY" },
+  cerebras: { baseUrl: "https://api.cerebras.ai/v1", style: "openai", keyEnv: "CEREBRAS_API_KEY" },
+  gemini: { baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai", style: "openai", keyEnv: "GEMINI_API_KEY" },
   ollama: { baseUrl: "http://localhost:11434", style: "ollama", keyEnv: null },
 };
 
