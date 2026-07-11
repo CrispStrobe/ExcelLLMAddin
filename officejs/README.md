@@ -29,7 +29,7 @@ temp files, and none of the encoding pain of the legacy `.xlam`.
 - `=LLM.CONFIG()` — show the active provider/model
 - **Agent** — describe an edit in plain English; the model reads/writes ranges, formulas, and formatting on your sheet via tool-calling (extensible with remote MCP servers)
 - A task pane (Home ▸ **LLM Settings**) to pick provider, model, key, or proxy
-- Providers: OpenAI, Mistral, Nebius, Scaleway, OpenRouter, Groq, Together AI, Cerebras, Google Gemini, Ollama (local)
+- Providers: OpenAI, Mistral, Nebius, Scaleway, OpenRouter, Groq, Together AI, Cerebras, Google Gemini, Cohere, Hugging Face, Requesty, Ollama (local)
 
 To ship it to users (hosting, org deployment, AppSource), see **[PUBLISHING.md](PUBLISHING.md)**.
 

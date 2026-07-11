@@ -25,6 +25,9 @@ const PROVIDERS = {
   together: { baseUrl: "https://api.together.xyz/v1", style: "openai", keyEnv: "TOGETHER_API_KEY" },
   cerebras: { baseUrl: "https://api.cerebras.ai/v1", style: "openai", keyEnv: "CEREBRAS_API_KEY" },
   gemini: { baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai", style: "openai", keyEnv: "GEMINI_API_KEY" },
+  cohere: { baseUrl: "https://api.cohere.ai/compatibility/v1", style: "openai", keyEnv: "COHERE_API_KEY" },
+  huggingface: { baseUrl: "https://router.huggingface.co/v1", style: "openai", keyEnv: "HF_TOKEN" },
+  requesty: { baseUrl: "https://router.requesty.ai/v1", style: "openai", keyEnv: "REQUESTY_API_KEY" },
   ollama: { baseUrl: "http://localhost:11434", style: "ollama", keyEnv: null },
 };
 

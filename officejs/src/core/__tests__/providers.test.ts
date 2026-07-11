@@ -35,7 +35,7 @@ describe("endpoints", () => {
   });
 
   test("OpenAI-compat cloud providers use openai-style paths", () => {
-    for (const id of ["groq", "together", "cerebras", "gemini"]) {
+    for (const id of ["groq", "together", "cerebras", "gemini", "cohere", "huggingface", "requesty"]) {
       const p = PROVIDERS[id];
       expect(p.style).toBe("openai");
       expect(chatEndpoint(p, p.defaultBaseUrl)).toBe(`${p.defaultBaseUrl}/chat/completions`);
@@ -58,7 +58,7 @@ describe("catalog invariants", () => {
 
   test("cloud providers that block the browser are marked not browserFriendly", () => {
     // These need the proxy; the UI keys its CORS hint off this flag.
-    for (const id of ["groq", "together", "cerebras", "gemini"]) {
+    for (const id of ["groq", "together", "cerebras", "gemini", "cohere", "huggingface", "requesty"]) {
       expect(PROVIDERS[id].browserFriendly).toBe(false);
       expect(PROVIDERS[id].requiresKey).toBe(true);
     }

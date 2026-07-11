@@ -63,6 +63,22 @@ export const PROVIDERS: Record<string, ProviderSpec> = {
     defaultBaseUrl: "https://generativelanguage.googleapis.com/v1beta/openai",
     requiresKey: true, style: "openai", browserFriendly: false,
   },
+  cohere: {
+    id: "cohere", label: "Cohere",
+    defaultBaseUrl: "https://api.cohere.ai/compatibility/v1",
+    requiresKey: true, style: "openai", browserFriendly: false,
+  },
+  huggingface: {
+    id: "huggingface", label: "Hugging Face",
+    // Inference-provider router; fronts many models with one OpenAI-compat API.
+    defaultBaseUrl: "https://router.huggingface.co/v1",
+    requiresKey: true, style: "openai", browserFriendly: false,
+  },
+  requesty: {
+    id: "requesty", label: "Requesty",
+    defaultBaseUrl: "https://router.requesty.ai/v1",
+    requiresKey: true, style: "openai", browserFriendly: false,
+  },
   ollama: {
     id: "ollama", label: "Ollama (local)",
     defaultBaseUrl: "http://localhost:11434",
