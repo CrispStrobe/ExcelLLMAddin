@@ -4,7 +4,7 @@
 // address parsing, 2D-value normalization, resize + formula-matrix construction,
 // and formatting — none of which needed live Excel to be correct, only reachable.
 
-import { executeExcelTool, WRITE_TOOLS, EXCEL_TOOLS } from "../excelTools";
+import { executeExcelTool, WRITE_TOOLS, EXCEL_TOOLS, resolveChartType } from "../excelTools";
 
 interface Preset {
   selectionAddress?: string;
@@ -18,10 +18,11 @@ let captured: {
   ranges: any[];
   resized: Array<{ from: string; rows: number; cols: number }>;
   addedSheet: string | null;
+  charts: any[];
 };
 
 function installExcel(preset: Preset = {}) {
-  captured = { ranges: [], resized: [], addedSheet: null };
+  captured = { ranges: [], resized: [], addedSheet: null, charts: [] };
 
   function makeRange(address: string): any {
     const dims = preset.rangeDims?.[address] ?? [1, 1];
@@ -43,16 +44,24 @@ function installExcel(preset: Preset = {}) {
     return rng;
   }
 
+  const makeCharts = () => ({
+    add(type: string, range: any, seriesBy: string) {
+      const chart: any = { name: "Chart 1", type, range, seriesBy, title: {}, load() {} };
+      captured.charts.push(chart);
+      return chart;
+    },
+  });
+
   const worksheets = {
     items: [] as any[],
     load() {
       this.items = (preset.sheetNames ?? ["Sheet1"]).map((name) => ({ name }));
     },
     getItem(name: string) {
-      return { name, getRange: (a: string) => makeRange(`${name}!${a}`) };
+      return { name, getRange: (a: string) => makeRange(`${name}!${a}`), charts: makeCharts() };
     },
     getActiveWorksheet() {
-      return { name: "Active", getRange: (a: string) => makeRange(a) };
+      return { name: "Active", getRange: (a: string) => makeRange(a), charts: makeCharts() };
     },
     add(name: string) {
       captured.addedSheet = name;
@@ -72,7 +81,10 @@ function installExcel(preset: Preset = {}) {
     sync: async () => {},
   };
 
-  (global as any).Excel = { run: async (cb: any) => cb(ctx) };
+  (global as any).Excel = {
+    run: async (cb: any) => cb(ctx),
+    ChartSeriesBy: { auto: "Auto" },
+  };
 }
 
 function rangeAt(address: string) {
@@ -162,15 +174,50 @@ describe("executeExcelTool", () => {
     expect(out).toBe('Added worksheet "Results".');
   });
 
+  test("create_chart adds a chart of the resolved type from the data range", async () => {
+    installExcel();
+    const out = await executeExcelTool("create_chart", {
+      address: "A1:B10",
+      chartType: "bar",
+      title: "Sales",
+    });
+    expect(captured.charts).toHaveLength(1);
+    expect(captured.charts[0].type).toBe("BarClustered");
+    expect(captured.charts[0].title.text).toBe("Sales");
+    expect(out).toBe('Created BarClustered chart "Sales" from A1:B10.');
+  });
+
+  test("create_chart falls back to a column chart for an unknown type", async () => {
+    installExcel();
+    await executeExcelTool("create_chart", { address: "A1:B10", chartType: "wobble" });
+    expect(captured.charts[0].type).toBe("ColumnClustered");
+  });
+
   test("unknown tool name returns a diagnostic instead of throwing", async () => {
     installExcel();
     expect(await executeExcelTool("bogus", {})).toBe("Unknown tool: bogus");
   });
 });
 
+describe("resolveChartType", () => {
+  test("maps synonyms and normalizes punctuation/casing", () => {
+    expect(resolveChartType("bar")).toBe("BarClustered");
+    expect(resolveChartType("Column Clustered")).toBe("ColumnClustered");
+    expect(resolveChartType("PIE")).toBe("Pie");
+    expect(resolveChartType("scatter")).toBe("XYScatter");
+    expect(resolveChartType("nonsense")).toBe("ColumnClustered"); // safe default
+  });
+});
+
 describe("tool metadata", () => {
   test("WRITE_TOOLS covers exactly the mutating tools", () => {
-    expect([...WRITE_TOOLS].sort()).toEqual(["add_worksheet", "set_format", "write_formula", "write_range"]);
+    expect([...WRITE_TOOLS].sort()).toEqual([
+      "add_worksheet",
+      "create_chart",
+      "set_format",
+      "write_formula",
+      "write_range",
+    ]);
     expect(WRITE_TOOLS.has("read_range")).toBe(false);
   });
 

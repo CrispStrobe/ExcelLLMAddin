@@ -70,7 +70,7 @@ a workbook anyway. Two supported setups:
 
 The task pane has an **Agent** box. Describe a change and the model operates your
 workbook via tool-calling — `read_range`, `write_range`, `write_formula`,
-`set_format`, `add_worksheet`, `get_selection`, `list_sheets` — looping until done.
+`set_format`, `add_worksheet`, `create_chart`, `get_selection`, `list_sheets` — looping until done.
 
 - **Approve-before-apply (default):** reads run live so the model sees your data,
   but writes are queued and shown as **Apply N changes** — you click to apply. A

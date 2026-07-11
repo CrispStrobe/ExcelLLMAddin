@@ -73,10 +73,40 @@ export const EXCEL_TOOLS: ToolSchema[] = [
       required: ["name"],
     },
   },
+  {
+    name: "create_chart",
+    description: "Create a chart from a data range (e.g. bar chart of B2:C20). Optional title.",
+    parameters: {
+      type: "object",
+      properties: {
+        address: { type: "string", description: "A1 range holding the chart data (incl. headers)" },
+        chartType: {
+          type: "string",
+          description: "One of: ColumnClustered, BarClustered, Line, Pie, XYScatter, Area",
+        },
+        title: { type: "string" },
+      },
+      required: ["address", "chartType"],
+    },
+  },
 ];
 
 /** Tools that change the workbook (vs. read-only). Used for approve-before-apply. */
-export const WRITE_TOOLS = new Set(["write_range", "write_formula", "set_format", "add_worksheet"]);
+export const WRITE_TOOLS = new Set(["write_range", "write_formula", "set_format", "add_worksheet", "create_chart"]);
+
+// Chart-type names the model may use → Excel.ChartType. Kept permissive so common
+// synonyms (bar/column/scatter) still resolve.
+const CHART_TYPES: Record<string, string> = {
+  columnclustered: "ColumnClustered",
+  column: "ColumnClustered",
+  bar: "BarClustered",
+  barclustered: "BarClustered",
+  line: "Line",
+  pie: "Pie",
+  scatter: "XYScatter",
+  xyscatter: "XYScatter",
+  area: "Area",
+};
 
 export async function executeExcelTool(name: string, args: any): Promise<string> {
   switch (name) {
@@ -94,6 +124,8 @@ export async function executeExcelTool(name: string, args: any): Promise<string>
       return setFormat(args);
     case "add_worksheet":
       return addWorksheet(String(args.name));
+    case "create_chart":
+      return createChart(String(args.address), String(args.chartType), args.title ? String(args.title) : "");
     default:
       return `Unknown tool: ${name}`;
   }
@@ -193,5 +225,28 @@ async function addWorksheet(name: string): Promise<string> {
     ws.load("name");
     await ctx.sync();
     return `Added worksheet "${ws.name}".`;
+  });
+}
+
+/** Map a model-supplied chart type (loose synonyms) to an Excel.ChartType name. */
+export function resolveChartType(t: string): string {
+  const key = String(t).trim().toLowerCase().replace(/[^a-z]/g, "");
+  return CHART_TYPES[key] ?? "ColumnClustered";
+}
+
+async function createChart(address: string, chartType: string, title: string): Promise<string> {
+  return Excel.run(async (ctx) => {
+    const bang = address.indexOf("!");
+    const sheet =
+      bang >= 0
+        ? ctx.workbook.worksheets.getItem(address.slice(0, bang).replace(/^'|'$/g, ""))
+        : ctx.workbook.worksheets.getActiveWorksheet();
+    const dataRange = sheet.getRange(bang >= 0 ? address.slice(bang + 1) : address);
+    const type = resolveChartType(chartType);
+    const chart = sheet.charts.add(type as Excel.ChartType, dataRange, Excel.ChartSeriesBy.auto);
+    if (title) chart.title.text = title;
+    chart.load("name");
+    await ctx.sync();
+    return `Created ${type} chart${title ? ` "${title}"` : ""} from ${address}.`;
   });
 }
