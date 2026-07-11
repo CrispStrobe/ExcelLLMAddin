@@ -176,4 +176,15 @@ describe("mapRange", () => {
     expect(calls.length).toBe(2);
     expect(JSON.parse(calls[0].init.body).messages[1].content).toContain("describe");
   });
+
+  test("reports a per-cell error instead of throwing when the call fails", async () => {
+    const fetch: FetchLike = async () => ({
+      ok: false,
+      status: 500,
+      text: async () => JSON.stringify({ error: { message: "upstream down" } }),
+    });
+    // A single non-empty cell takes the single-input chunk path (its own try/catch).
+    const out = await mapRange([["only"]], "up", settings, { fetch });
+    expect(out[0][0]).toMatch(/Error: upstream down/);
+  });
 });

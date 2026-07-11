@@ -1,4 +1,4 @@
-import { parseRpcResponse, connectMcp, McpFetch } from "../mcp";
+import { parseRpcResponse, connectMcp, browserMcpFetch, McpFetch } from "../mcp";
 
 function mcpMock(responses: string[], sessionId = "sess-1"): { fetchImpl: McpFetch; reqs: any[] } {
   const reqs: any[] = [];
@@ -29,6 +29,16 @@ describe("parseRpcResponse", () => {
 
   test("returns null when no message matches", () => {
     expect(parseRpcResponse("not json", 1)).toBeNull();
+  });
+
+  test("returns null on a malformed JSON body", () => {
+    expect(parseRpcResponse('{"id":1,', 1)).toBeNull();
+  });
+
+  test("falls back to any result/error message when the id does not match", () => {
+    // Some servers reply with a different id; still take the result-bearing message.
+    const r = parseRpcResponse('{"jsonrpc":"2.0","id":99,"result":{"x":1}}', 1);
+    expect(r.result).toEqual({ x: 1 });
   });
 });
 
@@ -61,5 +71,40 @@ describe("connectMcp", () => {
     const err = '{"jsonrpc":"2.0","id":2,"error":{"code":-32601,"message":"Method not found"}}';
     const { fetchImpl } = mcpMock([init, err]);
     await expect(connectMcp({ url: "https://mcp.example/rpc" }, fetchImpl)).rejects.toThrow(/Method not found/);
+  });
+
+  test("stringifies a non-array tool result", async () => {
+    const init = '{"jsonrpc":"2.0","id":1,"result":{}}';
+    const list = '{"jsonrpc":"2.0","id":2,"result":{"tools":[{"name":"ping","description":"","inputSchema":{}}]}}';
+    // result has no content array -> executor returns the JSON-stringified result.
+    const callResp = '{"jsonrpc":"2.0","id":3,"result":{"value":42}}';
+    const { fetchImpl } = mcpMock([init, list, callResp]);
+    const conn = await connectMcp({ url: "https://mcp.example/rpc" }, fetchImpl);
+    expect(await conn.executor("ping", {})).toBe('{"value":42}');
+  });
+});
+
+describe("browserMcpFetch", () => {
+  test("adapts the global fetch, exposing response headers", async () => {
+    let seen: any;
+    (global as any).fetch = async (url: string, init: any) => {
+      seen = { url, init };
+      return {
+        ok: true,
+        status: 200,
+        text: async () => "body",
+        headers: { get: (n: string) => (n === "Mcp-Session-Id" ? "sess-9" : null) },
+      };
+    };
+    const r = await browserMcpFetch("https://mcp.example/rpc", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{}",
+    });
+    expect(r.ok).toBe(true);
+    expect(r.status).toBe(200);
+    expect(await r.text()).toBe("body");
+    expect(r.header("Mcp-Session-Id")).toBe("sess-9");
+    expect(seen.url).toBe("https://mcp.example/rpc");
   });
 });

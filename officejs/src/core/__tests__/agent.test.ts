@@ -150,4 +150,66 @@ describe("chatWithTools", () => {
     expect(body.tools[0]).toMatchObject({ type: "function", function: { name: "write_range" } });
     expect(body.tool_choice).toBe("auto");
   });
+
+  test("throws before fetching when a required key is missing", async () => {
+    const { deps, calls } = queueMock([finalResponse("unused")]);
+    await expect(
+      chatWithTools([{ role: "user", content: "x" }], TOOLS, { provider: "openai", model: "m" }, deps)
+    ).rejects.toThrow(/No API key/);
+    expect(calls).toHaveLength(0);
+  });
+
+  test("throws on an unknown provider", async () => {
+    const { deps } = queueMock([finalResponse("unused")]);
+    await expect(
+      chatWithTools([{ role: "user", content: "x" }], TOOLS, { provider: "nope", model: "m" }, deps)
+    ).rejects.toThrow(/Unknown provider/);
+  });
+});
+
+/** Fetch double with control over ok/status, for error-path coverage. */
+function errMock(body: string, ok: boolean, status = 200): Deps {
+  const fetch: FetchLike = async () => ({ ok, status, text: async () => body });
+  return { fetch };
+}
+
+describe("chatWithTools error handling", () => {
+  test("surfaces a provider error message on an HTTP failure", async () => {
+    const deps = errMock('{"error":{"message":"server boom"}}', false, 500);
+    await expect(chatWithTools([], TOOLS, settings, deps)).rejects.toThrow("server boom");
+  });
+
+  test("falls back to the status code when the error body is unparseable", async () => {
+    const deps = errMock("<html>502 Bad Gateway</html>", false, 502);
+    await expect(chatWithTools([], TOOLS, settings, deps)).rejects.toThrow(/HTTP 502/);
+  });
+
+  test("surfaces an error object in an otherwise-ok body", async () => {
+    const deps = errMock('{"error":"model missing"}', true, 200);
+    await expect(chatWithTools([], TOOLS, settings, deps)).rejects.toThrow("model missing");
+  });
+});
+
+describe("runAgent argument parsing", () => {
+  test("malformed tool-call arguments degrade to an empty object, not a crash", async () => {
+    const badArgs = JSON.stringify({
+      choices: [
+        {
+          message: {
+            role: "assistant",
+            content: null,
+            tool_calls: [{ id: "c1", type: "function", function: { name: "write_range", arguments: "not json{" } }],
+          },
+        },
+      ],
+    });
+    const { deps } = queueMock([badArgs, finalResponse("recovered")]);
+    const executed: any[] = [];
+    const res = await runAgent("x", TOOLS, settings, deps, async (name, args) => {
+      executed.push({ name, args });
+      return "ok";
+    });
+    expect(executed).toEqual([{ name: "write_range", args: {} }]);
+    expect(res.finalText).toContain("recovered");
+  });
 });
