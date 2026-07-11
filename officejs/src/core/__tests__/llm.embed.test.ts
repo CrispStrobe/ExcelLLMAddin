@@ -128,6 +128,15 @@ describe("extraction fallbacks", () => {
     expect(extractModelList(PROVIDERS.openai, `{}`)).toEqual([]);
     expect(extractModelList(PROVIDERS.ollama, `{}`)).toEqual([]);
   });
+
+  test("extractModelList accepts a bare array of models (Together AI shape)", () => {
+    // Together returns [{id, ...}] instead of {data:[{id}]} — live-observed.
+    expect(extractModelList(PROVIDERS.together, `[{"id":"a"},{"id":"b"}]`)).toEqual(["a", "b"]);
+  });
+
+  test("extractModelList drops entries with no id/name", () => {
+    expect(extractModelList(PROVIDERS.openai, `{"data":[{"id":"a"},{"object":"model"}]}`)).toEqual(["a"]);
+  });
 });
 
 describe("directHeaders", () => {

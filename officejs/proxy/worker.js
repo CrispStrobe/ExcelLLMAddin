@@ -93,10 +93,9 @@ export default {
         const r = await fetch(url, { headers });
         const data = await r.json();
         if (data.error) return json({ error: errMsg(data.error) }, r.status || 502);
-        const models =
-          spec.style === "ollama"
-            ? (data.models || []).map((m) => m.name)
-            : (data.data || []).map((m) => m.id);
+        // OpenAI shape {data:[{id}]}, or a bare array (Together AI). Accept both.
+        const rows = spec.style === "ollama" ? data.models || [] : Array.isArray(data) ? data : data.data || [];
+        const models = rows.map((m) => (spec.style === "ollama" ? m.name : m.id || m.name)).filter(Boolean);
         return json({ models });
       }
 

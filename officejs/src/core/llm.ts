@@ -250,8 +250,12 @@ export function extractModelList(spec: ProviderSpec, text: string): string[] {
     const models = (data as any)?.models;
     if (Array.isArray(models)) return models.map((m: any) => String(m?.name)).filter(Boolean);
   } else {
-    const rows = (data as any)?.data;
-    if (Array.isArray(rows)) return rows.map((m: any) => String(m?.id)).filter(Boolean);
+    // OpenAI shape is {data:[{id}]}; some providers (e.g. Together AI) return a
+    // bare array of model objects instead. Accept either, and read id or name.
+    const rows = Array.isArray(data) ? data : (data as any)?.data;
+    if (Array.isArray(rows)) {
+      return rows.map((m: any) => String(m?.id ?? m?.name ?? "")).filter((s) => s && s !== "undefined");
+    }
   }
   return [];
 }

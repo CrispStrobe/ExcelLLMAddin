@@ -109,6 +109,32 @@ describe("runPrompt", () => {
   });
 });
 
+describe("new OpenAI-compat providers route through runPrompt", () => {
+  const cases = [
+    { id: "groq", host: "api.groq.com/openai/v1" },
+    { id: "together", host: "api.together.xyz/v1" },
+    { id: "cerebras", host: "api.cerebras.ai/v1" },
+    { id: "gemini", host: "generativelanguage.googleapis.com/v1beta/openai" },
+    { id: "cohere", host: "api.cohere.ai/compatibility/v1" },
+    { id: "huggingface", host: "router.huggingface.co/v1" },
+    { id: "requesty", host: "router.requesty.ai/v1" },
+  ];
+
+  test.each(cases)("$id hits /chat/completions with a bearer key", async ({ id, host }) => {
+    const { deps, calls } = mockFetch(`{"choices":[{"message":{"content":"ok"}}]}`);
+    const out = await runPrompt("hi", { provider: id, model: "m", apiKey: "sk-x" }, deps);
+    expect(out).toBe("ok");
+    expect(calls[0].url).toBe(`https://${host}/chat/completions`);
+    expect(calls[0].init.headers["Authorization"]).toBe("Bearer sk-x");
+  });
+
+  test.each(cases)("$id requires a key (fails fast without one)", async ({ id }) => {
+    const { deps, calls } = mockFetch(`{}`);
+    await expect(runPrompt("hi", { provider: id, model: "m" }, deps)).rejects.toThrow(/No API key/);
+    expect(calls.length).toBe(0);
+  });
+});
+
 describe("listModels", () => {
   test("ollama", async () => {
     const { deps } = mockFetch(`{"models":[{"name":"llama3.2"},{"name":"mistral"}]}`);

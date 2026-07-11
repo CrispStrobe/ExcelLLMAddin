@@ -54,7 +54,7 @@ with **approve-before-apply** by default. Its toolset can be extended with remot
 cd officejs
 npm install
 npm start        # builds, starts the https dev-server, sideloads into Excel
-npm test         # 130+ unit/functional tests (~99% line coverage), no Excel needed
+npm test         # 160+ unit/functional tests (~99% line coverage), no Excel needed
 ```
 Details, the browser dev-harness, and the CORS/proxy notes are in
 [officejs/README.md](officejs/README.md).

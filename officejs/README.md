@@ -87,7 +87,7 @@ tool-calling-capable model (gpt-4o-mini, Claude, Llama-3.3, …).
 ## Test it (on any platform, no Excel)
 
 ```bash
-npm test         # 130+ Jest unit + functional tests (~99% line coverage)
+npm test         # 160+ Jest unit + functional tests (~99% line coverage)
 npm run typecheck
 ```
 
@@ -95,8 +95,9 @@ The core (`src/core/*`) is Office-free and tested with a mocked `fetch`, so the
 request-build → parse → error pipeline is verified deterministically — this is
 the cross-platform CI gate. What's covered, all without Excel or a network:
 
-- **Transport** (`llm.ts`, `stream.ts`): direct + proxy chat/models/embeddings,
-  SSE + NDJSON streaming, provider selection, headers, and every error path.
+- **Transport** (`llm.ts`, `stream.ts`, `retry.ts`): direct + proxy
+  chat/models/embeddings, SSE + NDJSON streaming, provider selection + routing
+  (incl. every OpenAI-compat provider), headers, retry/backoff, and every error path.
 - **Tasks** (`tasks.ts`): all worksheet functions incl. `MAP` batching/fallback
   and `SIMILARITY`/cosine.
 - **Agent** (`agent.ts`, `excelTools.ts`): the tool-calling loop, approve-before-
@@ -105,6 +106,20 @@ the cross-platform CI gate. What's covered, all without Excel or a network:
   matrices, formatting).
 - **MCP** (`mcp.ts`): JSON-RPC build + plain-JSON/SSE response parsing.
 - **Config** (`config.ts`): settings persistence over a faked `OfficeRuntime.storage`.
+
+### Live provider tests (real network, opt-in)
+
+`src/core/__tests__/live.providers.test.ts` drives the **real** `runPrompt` /
+`listModels` / `embed` against live endpoints — the same code the add-in runs. It
+is **skipped by default** (no keys in CI) and each provider self-skips when its key
+is absent. Enable it with your keys:
+
+```bash
+LIVE_PROVIDERS=1 GROQ_API_KEY=… OPENROUTER_API_KEY=… npx jest live.providers
+```
+
+Verified live via this suite: Groq, OpenRouter, Nebius, Mistral, Cohere, and
+Hugging Face (chat + model listing), plus Nebius embeddings.
 
 Excel-only behaviour (custom-function registration, `=LLM.PROMPT` in a live cell)
 is checked separately — see `docs/MANUAL_TEST_CHECKLIST.md`.

@@ -20,6 +20,17 @@ describe("createStreamParser (openai SSE)", () => {
     const p = createStreamParser("openai");
     expect(p.push("\n\n: keep-alive\n")).toBe("");
   });
+
+  test("falls back to message.content when a chunk has no delta", () => {
+    // Some providers emit a whole message object in the final SSE event.
+    const p = createStreamParser("openai");
+    expect(p.push('data: {"choices":[{"message":{"content":"whole"}}]}\n')).toBe("whole");
+  });
+
+  test("skips a malformed data line without throwing", () => {
+    const p = createStreamParser("openai");
+    expect(p.push("data: {not valid json}\n")).toBe("");
+  });
 });
 
 describe("createStreamParser (ollama NDJSON)", () => {
