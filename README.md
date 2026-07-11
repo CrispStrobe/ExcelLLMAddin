@@ -59,6 +59,26 @@ npm test         # 130+ unit/functional tests (~99% line coverage), no Excel nee
 Details, the browser dev-harness, and the CORS/proxy notes are in
 [officejs/README.md](officejs/README.md).
 
+## Recipes
+
+Drop these into cells (Office.js namespace shown; the `.xlam` uses the same names
+without the `LLM.` prefix, e.g. `=CLASSIFY(...)`):
+
+| Goal | Formula |
+|---|---|
+| Tag each support ticket | `=LLM.CLASSIFY(A2, {"Bug";"Billing";"Feature"})` |
+| Split freeform text into columns | `=LLM.FIELDS(A2, "name, email, company")` (spills across) |
+| Translate a whole column at once | `=LLM.MAP(A2:A200, "translate to German")` (batched) |
+| Summarize to ~20 words | `=LLM.SUMMARIZE(A2, 20)` |
+| Score sentiment | `=LLM.SENTIMENT(A2)` |
+| Semantic match against a reference | `=LLM.SIMILARITY(A2, $B$1)` |
+| Answer from a range of context | `=LLM.ASK("what's the refund policy?", D2:D50)` |
+| Generate a list down a column | `=LLM.LIST("EU capital cities", 10)` |
+
+Agent (task pane, plain English): *"In D1 put the sum of B2:B10, then bold anything
+over 100"* · *"add a column classifying each row of my selection as high/low"*.
+Writes are queued for one-click **Apply** unless you opt into auto-apply.
+
 ## Providers
 
 OpenAI · Mistral · Nebius · Scaleway · OpenRouter · Ollama (local). OpenRouter,

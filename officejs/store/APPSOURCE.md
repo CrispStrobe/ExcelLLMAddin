@@ -97,6 +97,31 @@ The hosted, validated manifest to submit is
   >
   > Open source (AGPL-3.0).
 
+## Step 5 — notes for the certification tester (paste-ready)
+
+The single most common AppSource rejection for a BYO-key add-in is *"we couldn't
+get it to produce a result"* (the tester has no API key, and cloud providers block
+the browser on CORS). Pre-empt it — paste this into the submission's **Notes for
+certification** field, filling in one working path:
+
+> This add-in calls an LLM provider the user configures; it ships no keys. To
+> test end to end without any external account, use the bundled **local** path:
+>
+> 1. Install Ollama (ollama.com) and run `ollama pull llama3.2`.
+> 2. In Excel: **Home ▸ LLM Settings** → Provider **Ollama (local)**, Model
+>    `llama3.2`, leave the key blank → **Save**.
+> 3. In a cell: `=LLM.PROMPT("Say hello in French")` → returns a greeting.
+> 4. Open the task pane's **Agent** box, type *"Put the numbers 1 to 5 down
+>    column A"*, click **Run**, then **Apply** the queued change.
+>
+> If a cloud provider is preferred instead, here is a reviewer key for
+> **OpenRouter** (browser-friendly, no proxy needed): set Provider = OpenRouter,
+> paste the key `<REVIEWER_KEY>`, Model `openai/gpt-4o-mini`. Please rotate/revoke
+> after review.
+
+Provide **either** the Ollama steps **or** a live reviewer key/proxy — never leave
+the tester with a cloud provider and no credentials.
+
 ## Gotchas (AppSource-specific)
 
 - **Reviewers must be able to run it.** Like Apple's demo-account rule, Microsoft
