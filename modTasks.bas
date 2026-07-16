@@ -875,7 +875,7 @@ Private Function StripBullet(s As String) As String
     t = s
     Do While Len(t) > 0
         ch = Left(t, 1)
-        If ch = "-" Or ch = "*" Or ch = Chr(8226) Or ch = Chr(149) Then
+        If ch = "-" Or ch = "*" Or ch = ChrW(8226) Or ch = ChrW(149) Then
             t = Trim(Mid(t, 2))
         ElseIf ch Like "#" Then
             k = 1
