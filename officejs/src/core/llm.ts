@@ -9,12 +9,30 @@
 
 import {
   ProviderSpec,
+  ProviderStyle,
   getProvider,
   chatEndpoint,
   modelsEndpoint,
   embeddingsEndpoint,
 } from "./providers";
 import { parseUsage, TokenUsage } from "./usage";
+
+/** Report token usage parsed from a raw (direct) response body, if any. */
+function reportDirectUsage(deps: Deps, text: string, style: ProviderStyle): void {
+  if (!deps.onUsage) return;
+  const u = parseUsage(text, style);
+  if (u) deps.onUsage(u);
+}
+
+/** Report token usage from a proxy envelope's `usage` object, if present. */
+function reportProxyUsage(deps: Deps, usage: unknown): void {
+  if (!deps.onUsage || !usage || typeof usage !== "object") return;
+  const u = usage as Record<string, unknown>;
+  const p = Number(u.prompt_tokens) || 0;
+  const c = Number(u.completion_tokens) || 0;
+  const t = Number(u.total_tokens) || p + c;
+  if (p || c || t) deps.onUsage({ promptTokens: p, completionTokens: c, totalTokens: t });
+}
 
 export class LlmError extends Error {
   constructor(message: string) {
@@ -92,12 +110,7 @@ export async function runPrompt(
   if (settings.proxyUrl) {
     const data = await callProxy("chat", promptText, settings, spec, deps);
     result = String(data.content ?? "");
-    if (deps.onUsage && data.usage) {
-      const p = Number(data.usage.prompt_tokens) || 0;
-      const c = Number(data.usage.completion_tokens) || 0;
-      const t = Number(data.usage.total_tokens) || p + c;
-      if (p || c || t) deps.onUsage({ promptTokens: p, completionTokens: c, totalTokens: t });
-    }
+    reportProxyUsage(deps, data.usage);
   } else {
     const baseUrl = settings.baseUrl || spec.defaultBaseUrl;
     if (spec.requiresKey && !settings.apiKey) {
@@ -115,10 +128,7 @@ export async function runPrompt(
       throw new LlmError(parseErrorMessage(text) ?? `HTTP ${resp.status} from ${url}`);
     }
     result = extractChatContent(text);
-    if (deps.onUsage) {
-      const usage = parseUsage(text, spec.style);
-      if (usage) deps.onUsage(usage);
-    }
+    reportDirectUsage(deps, text, spec.style);
   }
 
   // Only successful results reach here (errors throw above), so errors aren't cached.
@@ -223,6 +233,7 @@ export async function embed(
     const data = await callProxy("embed", text, { ...settings, model }, spec, deps);
     if (!Array.isArray(data.embedding)) throw new LlmError("Proxy returned no embedding.");
     vec = (data.embedding as unknown[]).map(Number);
+    reportProxyUsage(deps, data.usage);
   } else {
     const baseUrl = settings.baseUrl || spec.defaultBaseUrl;
     if (spec.requiresKey && !settings.apiKey) {
@@ -238,6 +249,7 @@ export async function embed(
     const t = await resp.text();
     if (!resp.ok) throw new LlmError(parseErrorMessage(t) ?? `HTTP ${resp.status} from ${url}`);
     vec = extractEmbedding(t);
+    reportDirectUsage(deps, t, spec.style);
   }
 
   if (deps.cache) deps.cache.set(cacheKey, JSON.stringify(vec));
@@ -291,6 +303,7 @@ export async function embedBatch(
     const data = await callProxy("embed", "", { ...settings, model }, spec, deps, { inputs: missTexts });
     if (!Array.isArray(data.embeddings)) throw new LlmError("Proxy returned no embeddings.");
     vecs = (data.embeddings as unknown[]).map((v) => (v as unknown[]).map(Number));
+    reportProxyUsage(deps, data.usage);
   } else {
     const baseUrl = settings.baseUrl || spec.defaultBaseUrl;
     if (spec.requiresKey && !settings.apiKey) {
@@ -305,6 +318,7 @@ export async function embedBatch(
     const t = await resp.text();
     if (!resp.ok) throw new LlmError(parseErrorMessage(t) ?? `HTTP ${resp.status} from ${url}`);
     vecs = extractEmbeddingList(t, missTexts.length);
+    reportDirectUsage(deps, t, spec.style);
   }
 
   if (vecs.length !== missTexts.length) {

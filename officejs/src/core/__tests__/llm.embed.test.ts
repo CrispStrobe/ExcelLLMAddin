@@ -147,6 +147,45 @@ describe("embedBatch", () => {
   });
 });
 
+describe("embedding usage metering", () => {
+  // Capture whatever the code reports to onUsage.
+  function usageDeps(body: string, base: { deps: Deps }) {
+    const usages: any[] = [];
+    return { deps: { ...base.deps, onUsage: (u: any) => usages.push(u) }, usages };
+  }
+
+  test("embed (direct openai) reports token usage to the meter", async () => {
+    const base = mockFetch(`{"data":[{"embedding":[1,2]}],"usage":{"prompt_tokens":7,"total_tokens":7}}`);
+    const { deps, usages } = usageDeps("", base);
+    await embed("hi", "m", openai, deps);
+    expect(usages).toEqual([{ promptTokens: 7, completionTokens: 0, totalTokens: 7 }]);
+  });
+
+  test("embedBatch (direct openai) reports usage once for the whole batch", async () => {
+    const base = mockFetch(
+      `{"data":[{"embedding":[1]},{"embedding":[2]}],"usage":{"prompt_tokens":12,"total_tokens":12}}`
+    );
+    const { deps, usages } = usageDeps("", base);
+    await embedBatch(["a", "b"], "m", openai, deps);
+    expect(usages).toEqual([{ promptTokens: 12, completionTokens: 0, totalTokens: 12 }]);
+  });
+
+  test("no usage in the response → nothing reported (Ollama)", async () => {
+    const base = mockFetch(`{"embedding":[1,2]}`);
+    const { deps, usages } = usageDeps("", base);
+    await embed("hi", "nomic", ollama, deps);
+    expect(usages).toEqual([]);
+  });
+
+  test("embed via proxy reports the proxy-returned usage", async () => {
+    const base = mockFetch(`{"embedding":[1],"usage":{"prompt_tokens":3,"total_tokens":3}}`);
+    const { deps, usages } = usageDeps("", base);
+    const proxied: LlmSettings = { provider: "openai", model: "m", proxyUrl: "https://proxy.example/api" };
+    await embed("hi", "m", proxied, deps);
+    expect(usages).toEqual([{ promptTokens: 3, completionTokens: 0, totalTokens: 3 }]);
+  });
+});
+
 describe("listModels error paths", () => {
   test("throws on a missing api key", async () => {
     const { deps, calls } = mockFetch(`{}`);

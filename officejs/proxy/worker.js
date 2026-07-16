@@ -149,7 +149,7 @@ export default {
             : rows;
           const embeddings = ordered.map((x) => x.embedding);
           if (embeddings.some((e) => !Array.isArray(e))) return json({ error: "Malformed embeddings row" }, 502);
-          return json({ embeddings });
+          return json({ embeddings, usage: normUsage(data.usage) });
         }
         const body =
           spec.style === "ollama" ? { model: req.model, prompt: req.prompt } : { model: req.model, input: req.prompt };
@@ -158,7 +158,7 @@ export default {
         if (data.error) return json({ error: errMsg(data.error) }, r.status || 502);
         const emb = data.data?.[0]?.embedding ?? data.embedding ?? (data.embeddings && data.embeddings[0]);
         if (!Array.isArray(emb)) return json({ error: "No embedding in provider response" }, 502);
-        return json({ embedding: emb });
+        return json({ embedding: emb, usage: normUsage(data.usage) });
       }
 
       if (req.op === "models") {
@@ -216,4 +216,15 @@ function errMsg(err) {
   if (typeof err === "string") return err;
   if (err && typeof err === "object" && typeof err.message === "string") return err.message;
   return JSON.stringify(err);
+}
+
+// Normalize a provider usage object to the add-in's shape; undefined if absent
+// (embeddings responses report prompt_tokens/total_tokens but no completion_tokens).
+function normUsage(u) {
+  if (!u || typeof u !== "object") return undefined;
+  const p = u.prompt_tokens || 0;
+  const c = u.completion_tokens || 0;
+  const t = u.total_tokens || p + c;
+  if (!p && !c && !t) return undefined;
+  return { prompt_tokens: p, completion_tokens: c, total_tokens: t };
 }
