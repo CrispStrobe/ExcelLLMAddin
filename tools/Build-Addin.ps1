@@ -32,6 +32,8 @@ $modules = @(
     "modAgent.bas",
     "modMcp.bas",
     "modMenu.bas",
+    "modPane.bas",
+    "frmLLMPane.frm",
     "modTests.bas"
 )
 
@@ -40,6 +42,9 @@ $xlOpenXMLAddIn = 55
 $excel = New-Object -ComObject Excel.Application
 $excel.Visible = $false
 $excel.DisplayAlerts = $false
+# ForceDisable so an already-installed ExcelLLMAddin.xlam isn't auto-loaded into
+# this build instance (it would lock the output file and fail SaveAs).
+$excel.AutomationSecurity = 3
 try {
     $wb = $excel.Workbooks.Add()
     foreach ($m in $modules) {
@@ -49,7 +54,10 @@ try {
         [void]$wb.VBProject.VBComponents.Import($path)
     }
 
-    $outFull = [System.IO.Path]::GetFullPath((Join-Path (Get-Location) $Output))
+    # $Output is already an absolute path ($PSScriptRoot-relative); resolve ".."
+    # directly. (Join-Path with Get-Location double-rooted it -> "C:\..\C:\.." ->
+    # Excel SaveAs rejected the ":" and failed.)
+    $outFull = [System.IO.Path]::GetFullPath($Output)
     if (Test-Path $outFull) { Remove-Item $outFull -Force }
     $wb.SaveAs($outFull, $xlOpenXMLAddIn)
     Write-Host "Built add-in -> $outFull"

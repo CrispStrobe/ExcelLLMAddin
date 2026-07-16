@@ -49,6 +49,8 @@ $modules = @(
     "modAgent.bas",
     "modMcp.bas",
     "modMenu.bas",
+    "modPane.bas",
+    "frmLLMPane.frm",
     "modTests.bas"
 )
 

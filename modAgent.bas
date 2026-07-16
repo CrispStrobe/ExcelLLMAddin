@@ -106,9 +106,13 @@ Public Function RunAgentLoop(instruction As String, Optional maxSteps As Long = 
 
             Dim result As String
             If IsWriteTool(fname) Then
-                Dim pa As New Dictionary
-                pa.Add "name", fname
-                pa.Add "args", argsObj
+                ' NB: Set a FRESH dictionary each iteration - "Dim pa As New" would
+                ' reuse one instance across write-tools and throw "key already
+                ' exists" on the second queued change.
+                Dim pa As Dictionary
+                Set pa = New Dictionary
+                pa("name") = fname
+                pa("args") = argsObj
                 pending.Add pa
                 result = "Queued " & fname & " for approval (not applied yet)."
             Else
@@ -125,15 +129,18 @@ Public Function RunAgentLoop(instruction As String, Optional maxSteps As Long = 
 ApplyPending:
     If pending.Count > 0 Then
         Dim summary As String, j As Long
+        Dim pd As Object
         For j = 1 To pending.Count
-            summary = summary & "- " & pending(j)("name") & "(" & Left$(ArgsPreview(pending(j)("args")), 80) & ")" & vbLf
+            Set pd = pending(j)
+            summary = summary & "- " & CStr(pd("name")) & "(" & Left$(ArgsPreview(pd("args")), 80) & ")" & vbLf
         Next j
         If MsgBox("Apply these " & pending.Count & " change(s)?" & vbLf & vbLf & summary, _
                   vbYesNo + vbQuestion, "LLM Agent") = vbYes Then
             For j = 1 To pending.Count
+                Set pd = pending(j)
                 Dim r As String
-                r = ExecTool(CStr(pending(j)("name")), pending(j)("args"))
-                RunAgentLoop = RunAgentLoop & vbLf & "applied " & pending(j)("name") & " -> " & Left$(r, 80)
+                r = ExecTool(CStr(pd("name")), pd("args"))
+                RunAgentLoop = RunAgentLoop & vbLf & "applied " & CStr(pd("name")) & " -> " & Left$(r, 80)
             Next j
         Else
             RunAgentLoop = RunAgentLoop & vbLf & "(changes not applied)"
@@ -393,7 +400,7 @@ End Function
 
 Private Function FinalText(assistant As Object) As String
     If assistant.Exists("content") Then
-        If Not IsNull(assistant("content")) Then FinalText = CStr(assistant("content"))
+        If Not IsNull(assistant("content")) Then FinalText = StripThink(CStr(assistant("content")))
     End If
     If FinalText = "" Then FinalText = "(done)"
 End Function
@@ -407,9 +414,13 @@ Fail:
     Set ParseArgs = New Dictionary
 End Function
 
-Private Function ArgsPreview(args As Object) As String
+Private Function ArgsPreview(ByVal args As Variant) As String
     On Error Resume Next
-    ArgsPreview = JsonConverter.ConvertToJson(args)
+    If IsObject(args) Then
+        If args Is Nothing Then ArgsPreview = "{}" Else ArgsPreview = JsonConverter.ConvertToJson(args)
+    Else
+        ArgsPreview = CStr(args)
+    End If
 End Function
 
 ' Convert a JsonConverter array (Collection of rows/values) to a 2D array.

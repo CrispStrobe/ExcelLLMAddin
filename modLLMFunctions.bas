@@ -255,10 +255,9 @@ Public Function LIST_MODELS(Optional provider As String = "") As String
         LIST_MODELS = "Error: Invalid provider"
         Exit Function
     End If
-    If apiKey = "" And provider <> "ollama" Then
-        LIST_MODELS = "Error: No API key for " & provider
-        Exit Function
-    End If
+    ' NB: no hard "missing key" guard here. Several providers expose /models
+    ' without auth (OpenRouter is public, Ollama is local), so we always attempt
+    ' the request; providers that require a key return their own auth error.
 
     Select Case provider
         Case "ollama": endpoint = baseURL & "/api/tags"
@@ -312,7 +311,8 @@ End Function
 
 ' ---- internal helpers -------------------------------------------------------
 
-Private Sub EnsureConfig()
+' Public: called cross-module (modAgent.ChatWithTools, modPane) as well as here.
+Public Sub EnsureConfig()
     If CurrentProvider = "" Or OLLAMA_BASE_URL = "" Then Call LoadConfig
 End Sub
 
@@ -463,10 +463,10 @@ Private Function ExtractChatContent(ByVal jsonText As String, ByVal provider As 
             Set c0 = choices(1)
             If c0.Exists("message") Then
                 Set msg = c0("message")
-                ExtractChatContent = CStr(msg("content"))
+                ExtractChatContent = StripThink(CStr(msg("content")))
                 Exit Function
             ElseIf c0.Exists("text") Then
-                ExtractChatContent = CStr(c0("text"))
+                ExtractChatContent = StripThink(CStr(c0("text")))
                 Exit Function
             End If
         End If
@@ -475,7 +475,7 @@ Private Function ExtractChatContent(ByVal jsonText As String, ByVal provider As 
     If root.Exists("message") Then
         Set msg = root("message")
         If msg.Exists("content") Then
-            ExtractChatContent = CStr(msg("content"))
+            ExtractChatContent = StripThink(CStr(msg("content")))
             Exit Function
         End If
     End If
@@ -499,6 +499,26 @@ Private Function ExtractErrorMessage(ByVal errVal As Variant) As String
     Else
         ExtractErrorMessage = CStr(errVal)
     End If
+End Function
+
+' Remove <think>...</think> reasoning blocks that reasoning models (DeepSeek-R1,
+' QwQ, GLM, etc.) embed in the answer, leaving only the user-facing text. Handles
+' an unclosed <think> (reasoning streamed with no closing tag yet) by dropping to
+' the end. Public so the agent's FinalText can reuse it.
+Public Function StripThink(ByVal s As String) As String
+    Dim lo As Long, hi As Long
+    Const TOPEN As String = "<think>", TCLOSE As String = "</think>"
+    Do
+        lo = InStr(1, s, TOPEN, vbTextCompare)
+        If lo = 0 Then Exit Do
+        hi = InStr(lo, s, TCLOSE, vbTextCompare)
+        If hi = 0 Then
+            s = Left$(s, lo - 1)
+            Exit Do
+        End If
+        s = Left$(s, lo - 1) & Mid$(s, hi + Len(TCLOSE))
+    Loop
+    StripThink = Trim$(s)
 End Function
 
 ' Parse a models listing into a pipe-delimited string.
