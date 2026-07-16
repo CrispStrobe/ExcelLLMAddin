@@ -21,6 +21,11 @@ Public OLLAMA_BASE_URL As String
 Public CurrentProvider As String
 Public CurrentModel As String
 
+' Session usage meter (accumulated in ExtractChatContent from response `usage`).
+Public gUsCalls As Long
+Public gUsPromptTok As Long
+Public gUsComplTok As Long
+
 ' Keys for the extra OpenAI-compatible cloud providers (groq, together, cerebras,
 ' gemini, cohere, huggingface, requesty). Kept in one cross-platform Dictionary
 ' (vendored, works on Mac + Windows) instead of a fixed variable per provider, and
@@ -36,6 +41,26 @@ End Sub
 Public Sub SetProviderKey(ByVal provider As String, ByVal key As String)
     EnsureProviderKeys
     ProviderKeys(LCase(Trim(provider))) = key
+End Sub
+
+' ---- session usage meter ----------------------------------------------------
+Public Sub AccumulateUsage(ByVal root As Object)
+    On Error Resume Next
+    gUsCalls = gUsCalls + 1
+    If root.Exists("usage") Then
+        Dim u As Object
+        Set u = root("usage")
+        If u.Exists("prompt_tokens") Then gUsPromptTok = gUsPromptTok + CLng(u("prompt_tokens"))
+        If u.Exists("completion_tokens") Then gUsComplTok = gUsComplTok + CLng(u("completion_tokens"))
+    End If
+End Sub
+
+Public Function UsageSummary() As String
+    UsageSummary = "Usage: " & gUsCalls & " calls  |  " & gUsPromptTok & " in / " & gUsComplTok & " out tokens"
+End Function
+
+Public Sub ResetUsage()
+    gUsCalls = 0: gUsPromptTok = 0: gUsComplTok = 0
 End Sub
 
 ' Get config file location

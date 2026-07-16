@@ -39,7 +39,8 @@ End Sub
 ' Run the tool-calling loop. Returns a log + final summary. Write tools are queued
 ' and, at the end, applied only if the user confirms.
 Public Function RunAgentLoop(instruction As String, Optional maxSteps As Long = 8, _
-                             Optional provider As String = "", Optional model As String = "") As String
+                             Optional provider As String = "", Optional model As String = "", _
+                             Optional autoApply As Boolean = False) As String
     On Error GoTo Fail
 
     Dim messages As New Collection
@@ -134,7 +135,7 @@ ApplyPending:
             Set pd = pending(j)
             summary = summary & "- " & CStr(pd("name")) & "(" & Left$(ArgsPreview(pd("args")), 80) & ")" & vbLf
         Next j
-        If MsgBox("Apply these " & pending.Count & " change(s)?" & vbLf & vbLf & summary, _
+        If autoApply Or MsgBox("Apply these " & pending.Count & " change(s)?" & vbLf & vbLf & summary, _
                   vbYesNo + vbQuestion, "LLM Agent") = vbYes Then
             For j = 1 To pending.Count
                 Set pd = pending(j)

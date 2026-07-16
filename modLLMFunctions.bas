@@ -453,6 +453,8 @@ Private Function ExtractChatContent(ByVal jsonText As String, ByVal provider As 
         Exit Function
     End If
 
+    AccumulateUsage root      ' session usage meter (tokens/calls)
+
     Dim msg As Object, choices As Object, c0 As Object
 
     ' OpenAI-compatible shape first (covers most providers, incl. Ollama's

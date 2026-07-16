@@ -1,10 +1,10 @@
 VERSION 5.00
 Begin {C62A69F0-16DC-11CE-9E98-00AA00574A4F} frmLLMPane 
    Caption         =   "LLM Assistant"
-   ClientHeight    =   11040
+   ClientHeight    =   13560
    ClientLeft      =   100
    ClientTop       =   420
-   ClientWidth     =   6520
+   ClientWidth     =   6720
    OleObjectBlob   =   "frmLLMPane.frx":0000
    StartUpPosition =   1  'Fenstermitte
 End
@@ -19,6 +19,9 @@ End Sub
 Private Sub cboProvider_Change()
     modPane.Pane_ProviderChanged Me
 End Sub
+Private Sub cboPreset_Change()
+    modPane.Pane_PresetChosen Me
+End Sub
 Private Sub btnLoadModels_Click()
     modPane.Pane_LoadModels Me
 End Sub
@@ -27,6 +30,9 @@ Private Sub btnSave_Click()
 End Sub
 Private Sub btnTest_Click()
     modPane.Pane_Test Me
+End Sub
+Private Sub btnUsageReset_Click()
+    modPane.Pane_ResetUsage Me
 End Sub
 Private Sub btnRunPrompt_Click()
     modPane.Pane_RunPrompt Me
