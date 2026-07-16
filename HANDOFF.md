@@ -14,6 +14,7 @@ All work below is **committed and pushed to `main`** (`origin/main`). Pull first
 | `refactor(providers)` | `shared/providers.json` is the single source of truth; TS + proxy tables are generated from it; a guard test also checks the VBA URLs. Fixed a live drift: VBA had the dead `api.studio.nebius.ai`, now `.com`. |
 | `docs` | READMEs updated. |
 | `perf(config)` | Settings-read cache so a bulk recalc of many `=LLM.PROMPT` cells does ~1 storage read, not one per cell. |
+| `fix(usage)` | Embedding tokens (`=SIMILARITY`/`=RECALL`) now count in the task-pane meter; proxy passes embeddings `usage` back. **TS/proxy only — no VBA impact.** |
 
 ## Verified on this (macOS) machine — Office.js edition
 
