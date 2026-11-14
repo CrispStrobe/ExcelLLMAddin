@@ -48,10 +48,35 @@ Worksheet functions (namespace `LLM`):
 | `=LLM.MAP(range, instruction)` | Apply an instruction to every cell (batched) |
 | `=LLM.LIST_MODELS([provider])` · `=LLM.CONFIG()` | List models · show config |
 
+Agent tools add the steering verbs on top of `read_range` / `write_range` /
+`write_formula` / `set_format`: `set_number_format`, `merge_cells`,
+`unmerge_cells`, `set_column_width`, `set_row_height`, `rename_worksheet`,
+`recalculate`, and `run_steering` (a whole saved recipe in one approved step).
+
 Plus an **Agent**: describe a change in plain English in the task pane and the model
 reads/edits your workbook (ranges, formulas, formatting, sheets) via tool-calling —
 with **approve-before-apply** by default. Its toolset can be extended with remote
 **MCP** servers.
+
+The agent also runs **portable steering recipes** — the same JSON task files used by
+[`excel-steer`](https://github.com/CrispStrobe/excel-steering) on the desktop. A
+recipe is plain data: values, formulas, formatting, merges, widths/heights,
+recalculation and assertions. Save it once, then replay it from the task pane
+(`run_steering`), from the CLI, or from a test:
+
+```json
+{
+  "name": "01-format-header",
+  "ops": [
+    { "op": "format", "range": "A1:D1", "bold": true, "fill": "FFEB9C", "number_format": "0.00" },
+    { "op": "column_width", "col": "B", "width": 18 },
+    { "op": "row_height", "row": 1, "height": 24 }
+  ]
+}
+```
+
+Five reviewed recipes live in [`steering/`](./steering): header formatting,
+merge-and-title, a calculated SUM/ROUND table, number formats, and merge/geometry.
 
 ## Quick start
 

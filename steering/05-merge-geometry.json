@@ -1,0 +1,14 @@
+{
+  "name": "05-merge-geometry",
+  "description": "Merge a 2x2 block and set column widths and row heights in Excel units.",
+  "recalc": false,
+  "ops": [
+    { "op": "set_value", "ref": "C1", "value": "Merged block" },
+    { "op": "merge", "range": "C1:D2", "center": true },
+    { "op": "column_width", "col": "A", "width": 8 },
+    { "op": "column_width", "col": "B", "width": 24 },
+    { "op": "column_width", "col": "C", "width": 12 },
+    { "op": "row_height", "row": 1, "height": 30 },
+    { "op": "row_height", "row": 2, "height": 15 }
+  ]
+}

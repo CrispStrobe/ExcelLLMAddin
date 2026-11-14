@@ -1,0 +1,16 @@
+{
+  "name": "02-merge-title",
+  "description": "Write a title into A1 and merge A1:D1, centred, bold 14 pt on a light blue fill.",
+  "recalc": false,
+  "ops": [
+    { "op": "set_value", "ref": "A1", "value": "Report" },
+    { "op": "merge", "range": "A1:D1", "center": true },
+    {
+      "op": "format",
+      "range": "A1:D1",
+      "bold": true,
+      "font_size": 14,
+      "fill": "DDEBF7"
+    }
+  ]
+}

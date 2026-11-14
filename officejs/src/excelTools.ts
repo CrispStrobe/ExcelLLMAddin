@@ -4,6 +4,13 @@
 // is tested in core/__tests__/agent.test.ts.
 
 import { ToolSchema } from "./core/agent";
+import {
+  SteeringOp,
+  SteeringTask,
+  columnWidthToPoints,
+  normalizeSteeringTask,
+  rowHeightToPoints,
+} from "./core/steering";
 
 /* global Excel */
 
@@ -89,10 +96,116 @@ export const EXCEL_TOOLS: ToolSchema[] = [
       required: ["address", "chartType"],
     },
   },
+  {
+    name: "set_number_format",
+    description: "Apply an Excel number format to a range, e.g. #,##0.00, 0.0%, DD.MM.YYYY.",
+    parameters: {
+      type: "object",
+      properties: {
+        address: { type: "string", description: "A1 cell/range, optionally Sheet1!A1:B2" },
+        format: { type: "string", description: "Excel format code" },
+      },
+      required: ["address", "format"],
+    },
+  },
+  {
+    name: "merge_cells",
+    description: "Merge a range into one cell; optionally centre the result (default true).",
+    parameters: {
+      type: "object",
+      properties: {
+        address: { type: "string" },
+        center: { type: "boolean" },
+      },
+      required: ["address"],
+    },
+  },
+  {
+    name: "unmerge_cells",
+    description: "Split a merged range back into individual cells.",
+    parameters: {
+      type: "object",
+      properties: { address: { type: "string" } },
+      required: ["address"],
+    },
+  },
+  {
+    name: "set_column_width",
+    description: "Set a column width. Units: chars (default), points, or px.",
+    parameters: {
+      type: "object",
+      properties: {
+        column: { type: "string", description: "Column letter, e.g. B" },
+        width: { type: "number" },
+        unit: { type: "string", description: "chars | points | px" },
+        sheet: { type: "string" },
+      },
+      required: ["column", "width"],
+    },
+  },
+  {
+    name: "set_row_height",
+    description: "Set a row height in points (default) or px.",
+    parameters: {
+      type: "object",
+      properties: {
+        row: { type: "number", description: "1-based row number" },
+        height: { type: "number" },
+        unit: { type: "string", description: "points | px" },
+        sheet: { type: "string" },
+      },
+      required: ["row", "height"],
+    },
+  },
+  {
+    name: "recalculate",
+    description: "Force a full workbook recalculation.",
+    parameters: { type: "object", properties: {} },
+  },
+  {
+    name: "rename_worksheet",
+    description: "Rename an existing worksheet.",
+    parameters: {
+      type: "object",
+      properties: { from: { type: "string" }, to: { type: "string" } },
+      required: ["from", "to"],
+    },
+  },
+  {
+    name: "run_steering",
+    description:
+      "Run a portable Excel steering task (the same JSON file excel-steer uses): " +
+      "{ops:[{op:set_value|set_formula|format|merge|unmerge|column_width|row_height|add_sheet|rename_sheet|recalculate|assert, ...}]}. " +
+      "Use it to replay a saved recipe exactly instead of issuing many separate edits.",
+    parameters: {
+      type: "object",
+      properties: {
+        task: {
+          description: "The task object, or its JSON text",
+          type: "object",
+        },
+      },
+      required: ["task"],
+    },
+  },
 ];
 
 /** Tools that change the workbook (vs. read-only). Used for approve-before-apply. */
-export const WRITE_TOOLS = new Set(["write_range", "write_formula", "set_format", "add_worksheet", "create_chart"]);
+export const WRITE_TOOLS = new Set([
+  "write_range",
+  "write_formula",
+  "set_format",
+  "add_worksheet",
+  "create_chart",
+  "set_number_format",
+  "merge_cells",
+  "unmerge_cells",
+  "set_column_width",
+  "set_row_height",
+  "recalculate",
+  "rename_worksheet",
+  "run_steering",
+]);
 
 // Chart-type names the model may use → Excel.ChartType. Kept permissive so common
 // synonyms (bar/column/scatter) still resolve.
@@ -126,6 +239,22 @@ export async function executeExcelTool(name: string, args: any): Promise<string>
       return addWorksheet(String(args.name));
     case "create_chart":
       return createChart(String(args.address), String(args.chartType), args.title ? String(args.title) : "");
+    case "set_number_format":
+      return setNumberFormat(String(args.address), String(args.format));
+    case "merge_cells":
+      return mergeCells(String(args.address), args.center !== false);
+    case "unmerge_cells":
+      return unmergeCells(String(args.address));
+    case "set_column_width":
+      return setColumnWidth(String(args.column), Number(args.width), args.unit, args.sheet);
+    case "set_row_height":
+      return setRowHeight(Number(args.row), Number(args.height), args.unit, args.sheet);
+    case "recalculate":
+      return recalculateWorkbook();
+    case "rename_worksheet":
+      return renameWorksheet(String(args.from), String(args.to));
+    case "run_steering":
+      return runSteering(args.task);
     default:
       return `Unknown tool: ${name}`;
   }
@@ -249,4 +378,194 @@ async function createChart(address: string, chartType: string, title: string): P
     await ctx.sync();
     return `Created ${type} chart${title ? ` "${title}"` : ""} from ${address}.`;
   });
+}
+
+
+// --------------------------------------------------------------------------
+// Portable steering operations
+
+function worksheetFromName(ctx: Excel.RequestContext, sheet?: string): Excel.Worksheet {
+  return sheet
+    ? ctx.workbook.worksheets.getItem(sheet)
+    : ctx.workbook.worksheets.getActiveWorksheet();
+}
+
+async function setNumberFormat(address: string, format: string): Promise<string> {
+  return Excel.run(async (ctx) => {
+    const rng = rangeFromAddress(ctx, address);
+    rng.load("rowCount,columnCount,address");
+    await ctx.sync();
+    rng.numberFormat = Array.from({ length: rng.rowCount }, () =>
+      Array.from({ length: rng.columnCount }, () => format)
+    );
+    await ctx.sync();
+    return `Applied ${format} to ${rng.address}.`;
+  });
+}
+
+async function mergeCells(address: string, center: boolean): Promise<string> {
+  return Excel.run(async (ctx) => {
+    const rng = rangeFromAddress(ctx, address);
+    rng.merge(false);
+    if (center) rng.format.horizontalAlignment = Excel.HorizontalAlignment.center;
+    rng.load("address");
+    await ctx.sync();
+    return `Merged ${rng.address}${center ? " (centred)" : ""}.`;
+  });
+}
+
+async function unmergeCells(address: string): Promise<string> {
+  return Excel.run(async (ctx) => {
+    const rng = rangeFromAddress(ctx, address);
+    rng.unmerge();
+    rng.load("address");
+    await ctx.sync();
+    return `Unmerged ${rng.address}.`;
+  });
+}
+
+async function setColumnWidth(
+  column: string,
+  width: number,
+  unit: string | undefined,
+  sheet: string | undefined
+): Promise<string> {
+  const points = columnWidthToPoints(width, (unit as "chars" | "points" | "px") ?? "chars");
+  return Excel.run(async (ctx) => {
+    const ws = worksheetFromName(ctx, sheet);
+    ws.getRange(`${column}:${column}`).format.columnWidth = points;
+    await ctx.sync();
+    return `Set column ${column}${sheet ? ` on ${sheet}` : ""} to ${points.toFixed(2)} pt.`;
+  });
+}
+
+async function setRowHeight(
+  row: number,
+  height: number,
+  unit: string | undefined,
+  sheet: string | undefined
+): Promise<string> {
+  const points = rowHeightToPoints(height, (unit as "points" | "px") ?? "points");
+  return Excel.run(async (ctx) => {
+    const ws = worksheetFromName(ctx, sheet);
+    ws.getRange(`${row}:${row}`).format.rowHeight = points;
+    await ctx.sync();
+    return `Set row ${row}${sheet ? ` on ${sheet}` : ""} to ${points.toFixed(2)} pt.`;
+  });
+}
+
+async function recalculateWorkbook(): Promise<string> {
+  return Excel.run(async (ctx) => {
+    ctx.workbook.application.calculate("Full");
+    await ctx.sync();
+    return "Recalculated the workbook.";
+  });
+}
+
+async function renameWorksheet(from: string, to: string): Promise<string> {
+  return Excel.run(async (ctx) => {
+    const ws = ctx.workbook.worksheets.getItem(from);
+    ws.name = to;
+    await ctx.sync();
+    return `Renamed "${from}" to "${to}".`;
+  });
+}
+
+/** Execute one steering operation against an open request context. */
+async function applySteeringOp(ctx: Excel.RequestContext, op: SteeringOp): Promise<string> {
+  switch (op.op) {
+    case "set_value": {
+      const rng = rangeFromAddress(ctx, op.sheet ? `${op.sheet}!${op.ref}` : op.ref);
+      rng.values = [[op.value]];
+      return `set_value ${op.ref}`;
+    }
+    case "set_formula": {
+      const rng = rangeFromAddress(ctx, op.sheet ? `${op.sheet}!${op.range}` : op.range);
+      rng.load("rowCount,columnCount");
+      await ctx.sync();
+      const formula = op.formula.startsWith("=") ? op.formula : `=${op.formula}`;
+      rng.formulas = Array.from({ length: rng.rowCount }, () =>
+        Array.from({ length: rng.columnCount }, () => formula)
+      );
+      return `set_formula ${op.range}`;
+    }
+    case "format": {
+      const rng = rangeFromAddress(ctx, op.sheet ? `${op.sheet}!${op.range}` : op.range);
+      if (typeof op.bold === "boolean") rng.format.font.bold = op.bold;
+      if (typeof op.italic === "boolean") rng.format.font.italic = op.italic;
+      if (typeof op.font_size === "number") rng.format.font.size = op.font_size;
+      if (op.font_color) rng.format.font.color = op.font_color;
+      if (op.fill) rng.format.fill.color = op.fill;
+      if (op.number_format) {
+        rng.load("rowCount,columnCount");
+        await ctx.sync();
+        rng.numberFormat = Array.from({ length: rng.rowCount }, () =>
+          Array.from({ length: rng.columnCount }, () => String(op.number_format))
+        );
+      }
+      if (op.align) {
+        const alignment = {
+          left: Excel.HorizontalAlignment.left,
+          center: Excel.HorizontalAlignment.center,
+          right: Excel.HorizontalAlignment.right,
+          general: Excel.HorizontalAlignment.general,
+        }[op.align];
+        rng.format.horizontalAlignment = alignment;
+      }
+      return `format ${op.range}`;
+    }
+    case "merge": {
+      const rng = rangeFromAddress(ctx, op.sheet ? `${op.sheet}!${op.range}` : op.range);
+      rng.merge(false);
+      if (op.center !== false) rng.format.horizontalAlignment = Excel.HorizontalAlignment.center;
+      return `merge ${op.range}`;
+    }
+    case "unmerge": {
+      const rng = rangeFromAddress(ctx, op.sheet ? `${op.sheet}!${op.range}` : op.range);
+      rng.unmerge();
+      return `unmerge ${op.range}`;
+    }
+    case "column_width": {
+      const ws = worksheetFromName(ctx, op.sheet);
+      ws.getRange(`${op.col}:${op.col}`).format.columnWidth = columnWidthToPoints(op.width, op.unit);
+      return `column_width ${op.col}=${op.width}`;
+    }
+    case "row_height": {
+      const ws = worksheetFromName(ctx, op.sheet);
+      ws.getRange(`${op.row}:${op.row}`).format.rowHeight = rowHeightToPoints(op.height, op.unit);
+      return `row_height ${op.row}=${op.height}`;
+    }
+    case "add_sheet": {
+      ctx.workbook.worksheets.add(op.name);
+      return `add_sheet ${op.name}`;
+    }
+    case "rename_sheet": {
+      ctx.workbook.worksheets.getItem(op.from).name = op.to;
+      return `rename_sheet ${op.from}->${op.to}`;
+    }
+    case "recalculate": {
+      ctx.workbook.application.calculate("Full");
+      return "recalculate";
+    }
+    case "assert": {
+      const rng = rangeFromAddress(ctx, op.sheet ? `${op.sheet}!${op.ref}` : op.ref);
+      rng.load("values");
+      await ctx.sync();
+      const actual = rng.values[0]?.[0];
+      const ok = String(actual ?? "") === String(op.equals ?? "");
+      return `assert ${op.ref}: expected ${JSON.stringify(op.equals)}, got ${JSON.stringify(actual)} ${ok ? "OK" : "MISMATCH"}`;
+    }
+  }
+}
+
+async function runSteering(taskInput: unknown): Promise<string> {
+  const task: SteeringTask = normalizeSteeringTask(taskInput);
+  const results = await Excel.run(async (ctx) => {
+    const done: string[] = [];
+    for (const op of task.ops) done.push(await applySteeringOp(ctx, op));
+    if (task.recalc) ctx.workbook.application.calculate("Full");
+    await ctx.sync();
+    return done;
+  });
+  return `${task.name ?? "steering task"}: ${results.length} ops applied — ${results.join("; ")}`;
 }

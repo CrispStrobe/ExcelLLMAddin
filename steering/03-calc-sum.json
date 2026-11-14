@@ -1,0 +1,72 @@
+{
+  "name": "03-calc-sum",
+  "description": "Build a small multiplication table with row totals, SUM and ROUND, then recalculate.",
+  "recalc": true,
+  "ops": [
+    {
+      "op": "set_value",
+      "ref": "A1",
+      "value": "Qty"
+    },
+    {
+      "op": "set_value",
+      "ref": "B1",
+      "value": "Price"
+    },
+    {
+      "op": "set_value",
+      "ref": "C1",
+      "value": "Total"
+    },
+    {
+      "op": "set_value",
+      "ref": "A2",
+      "value": 2
+    },
+    {
+      "op": "set_value",
+      "ref": "B2",
+      "value": 3.5
+    },
+    {
+      "op": "set_value",
+      "ref": "A3",
+      "value": 4
+    },
+    {
+      "op": "set_value",
+      "ref": "B3",
+      "value": 1.25
+    },
+    {
+      "op": "format",
+      "range": "C2:D5",
+      "number_format": "General"
+    },
+    {
+      "op": "set_formula",
+      "range": "C2:C3",
+      "formula": "=A2*B2"
+    },
+    {
+      "op": "set_value",
+      "ref": "C4",
+      "value": "Sum"
+    },
+    {
+      "op": "set_formula",
+      "range": "D4",
+      "formula": "=SUM(C2:C3)"
+    },
+    {
+      "op": "set_value",
+      "ref": "C5",
+      "value": "Avg"
+    },
+    {
+      "op": "set_formula",
+      "range": "D5",
+      "formula": "=ROUND(D4/2,2)"
+    }
+  ]
+}
