@@ -1,0 +1,19 @@
+{
+  "name": "01-format-header",
+  "description": "Emphasise a header row: bold, 12 pt, amber fill, dark red text, 2-decimal format; widen column B; raise row 1.",
+  "recalc": false,
+  "ops": [
+    {
+      "op": "format",
+      "range": "A1:D1",
+      "bold": true,
+      "font_size": 12,
+      "fill": "FFEB9C",
+      "font_color": "9C0006",
+      "number_format": "0.00",
+      "align": "center"
+    },
+    { "op": "column_width", "col": "B", "width": 18 },
+    { "op": "row_height", "row": 1, "height": 24 }
+  ]
+}

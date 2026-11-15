@@ -1,0 +1,15 @@
+{
+  "name": "04-number-formats",
+  "description": "Apply currency, percentage and date number formats to populated cells, then recalculate.",
+  "recalc": true,
+  "ops": [
+    { "op": "set_value", "ref": "B1", "value": 1234.5678 },
+    { "op": "set_value", "ref": "B2", "value": 0.256 },
+    { "op": "set_value", "ref": "B3", "value": 45000 },
+    { "op": "format", "range": "B1", "number_format": "#,##0.00" },
+    { "op": "format", "range": "B2", "number_format": "0.0%" },
+    { "op": "format", "range": "B3", "number_format": "DD.MM.YYYY" },
+    { "op": "format", "range": "B4", "number_format": "#,##0.00" },
+    { "op": "set_formula", "range": "B4", "formula": "=B1*2" }
+  ]
+}

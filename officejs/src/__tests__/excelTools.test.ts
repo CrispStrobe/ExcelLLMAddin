@@ -19,10 +19,12 @@ let captured: {
   resized: Array<{ from: string; rows: number; cols: number }>;
   addedSheet: string | null;
   charts: any[];
+  calculations: string[];
+  renamed: Array<{ from: string; to: string }>;
 };
 
 function installExcel(preset: Preset = {}) {
-  captured = { ranges: [], resized: [], addedSheet: null, charts: [] };
+  captured = { ranges: [], resized: [], addedSheet: null, charts: [], calculations: [], renamed: [] };
 
   function makeRange(address: string): any {
     const dims = preset.rangeDims?.[address] ?? [1, 1];
@@ -32,6 +34,12 @@ function installExcel(preset: Preset = {}) {
       rowCount: dims[0],
       columnCount: dims[1],
       format: { fill: {}, font: {} },
+      merge(across: boolean) {
+        rng.merged = across;
+      },
+      unmerge() {
+        rng.unmerged = true;
+      },
       load() {
         /* no-op: values are preset */
       },
@@ -58,7 +66,19 @@ function installExcel(preset: Preset = {}) {
       this.items = (preset.sheetNames ?? ["Sheet1"]).map((name) => ({ name }));
     },
     getItem(name: string) {
-      return { name, getRange: (a: string) => makeRange(`${name}!${a}`), charts: makeCharts() };
+      const sheet: any = {
+        name,
+        getRange: (a: string) => makeRange(`${name}!${a}`),
+        charts: makeCharts(),
+      };
+      Object.defineProperty(sheet, "name", {
+        get: () => name,
+        set: (value: string) => {
+          captured.renamed.push({ from: name, to: value });
+          name = value;
+        },
+      });
+      return sheet;
     },
     getActiveWorksheet() {
       return { name: "Active", getRange: (a: string) => makeRange(a), charts: makeCharts() };
@@ -71,6 +91,11 @@ function installExcel(preset: Preset = {}) {
 
   const ctx = {
     workbook: {
+      application: {
+        calculate(kind: string) {
+          captured.calculations.push(kind);
+        },
+      },
       worksheets,
       getSelectedRange() {
         const r = makeRange(preset.selectionAddress ?? "B2");
@@ -84,6 +109,12 @@ function installExcel(preset: Preset = {}) {
   (global as any).Excel = {
     run: async (cb: any) => cb(ctx),
     ChartSeriesBy: { auto: "Auto" },
+    HorizontalAlignment: {
+      left: "Left",
+      center: "Center",
+      right: "Right",
+      general: "General",
+    },
   };
 }
 
@@ -214,7 +245,15 @@ describe("tool metadata", () => {
     expect([...WRITE_TOOLS].sort()).toEqual([
       "add_worksheet",
       "create_chart",
+      "merge_cells",
+      "recalculate",
+      "rename_worksheet",
+      "run_steering",
+      "set_column_width",
       "set_format",
+      "set_number_format",
+      "set_row_height",
+      "unmerge_cells",
       "write_formula",
       "write_range",
     ]);
@@ -224,5 +263,90 @@ describe("tool metadata", () => {
   test("every WRITE_TOOL has a matching schema in EXCEL_TOOLS", () => {
     const names = new Set(EXCEL_TOOLS.map((t) => t.name));
     for (const w of WRITE_TOOLS) expect(names.has(w)).toBe(true);
+  });
+});
+
+
+describe("portable steering tools", () => {
+  test("set_number_format applies a matrix over the range", async () => {
+    installExcel({ rangeDims: { "A1:B1": [1, 2] } });
+    const out = await executeExcelTool("set_number_format", { address: "A1:B1", format: "#,##0.00" });
+    expect(rangeAt("A1:B1").numberFormat).toEqual([["#,##0.00", "#,##0.00"]]);
+    expect(out).toContain("Applied #,##0.00");
+  });
+
+  test("merge_cells merges and centres by default", async () => {
+    installExcel();
+    await executeExcelTool("merge_cells", { address: "A1:C1" });
+    const r = rangeAt("A1:C1");
+    expect(r.merged).toBe(false);
+    expect(r.format.horizontalAlignment).toBe("Center");
+  });
+
+  test("unmerge_cells splits the range", async () => {
+    installExcel();
+    await executeExcelTool("unmerge_cells", { address: "A1:C1" });
+    expect(rangeAt("A1:C1").unmerged).toBe(true);
+  });
+
+  test("set_column_width converts character widths to points", async () => {
+    installExcel();
+    await executeExcelTool("set_column_width", { column: "B", width: 18 });
+    expect(rangeAt("B:B").format.columnWidth).toBeCloseTo((18 * 7 * 72) / 96);
+  });
+
+  test("set_row_height keeps points and converts px", async () => {
+    installExcel();
+    await executeExcelTool("set_row_height", { row: 1, height: 24 });
+    expect(rangeAt("1:1").format.rowHeight).toBe(24);
+    await executeExcelTool("set_row_height", { row: 2, height: 32, unit: "px" });
+    expect(rangeAt("2:2").format.rowHeight).toBe(24);
+  });
+
+  test("recalculate asks Excel for a full calculation", async () => {
+    installExcel();
+    expect(await executeExcelTool("recalculate", {})).toContain("Recalculated");
+    expect(captured.calculations).toEqual(["Full"]);
+  });
+
+  test("rename_worksheet renames in place", async () => {
+    installExcel();
+    const out = await executeExcelTool("rename_worksheet", { from: "Sheet1", to: "Data" });
+    expect(captured.renamed).toEqual([{ from: "Sheet1", to: "Data" }]);
+    expect(out).toBe('Renamed "Sheet1" to "Data".');
+  });
+
+  test("run_steering replays a saved task in order", async () => {
+    installExcel({ rangeDims: { "A1:D1": [1, 4] } });
+    const out = await executeExcelTool("run_steering", {
+      task: {
+        name: "header",
+        recalc: true,
+        ops: [
+          { op: "format", range: "A1:D1", bold: true, fill: "#FFEB9C", number_format: "0.00" },
+          { op: "column_width", col: "B", width: 18 },
+          { op: "recalculate" },
+        ],
+      },
+    });
+    expect(rangeAt("A1:D1").format.font.bold).toBe(true);
+    expect(rangeAt("A1:D1").format.fill.color).toBe("#FFEB9C");
+    expect(out).toContain("header: 3 ops applied");
+    expect(captured.calculations).toContain("Full");
+  });
+
+  test("run_steering rejects an unknown operation before writing", async () => {
+    installExcel();
+    await expect(
+      executeExcelTool("run_steering", { task: { ops: [{ op: "explode", range: "A1" }] } })
+    ).rejects.toThrow(/unknown op/);
+  });
+
+  test("every write tool is declared and unique", () => {
+    const names = EXCEL_TOOLS.map((tool) => tool.name);
+    expect(new Set(names).size).toBe(names.length);
+    for (const name of Array.from(WRITE_TOOLS)) {
+      expect(names).toContain(name);
+    }
   });
 });
